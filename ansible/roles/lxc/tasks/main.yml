@@ -1,0 +1,33 @@
+- name: Container config
+  ansible.builtin.command: pct config {{ ct_id }}
+  delegate_to: sarten
+  register: ct
+  changed_when: false
+
+- name: Features
+  ansible.builtin.command: pct set {{ ct_id }} -features {{ ct_features }}
+  delegate_to: sarten
+  when: >-
+    ct_features is defined and ('features: ' ~ ct_features) not in ct.stdout
+  register: features
+
+- name: Bind mounts
+  ansible.builtin.command: pct set {{ ct_id }} -{{ item.key }} {{ item.host }},mp={{ item.path }}
+  loop: "{{ ct_mounts | default([]) }}"
+  loop_control:
+    label: "{{ item.host }}"
+  delegate_to: sarten
+  when: >-
+    (item.key ~ ': ' ~ item.host ~ ',mp=' ~ item.path) not in ct.stdout
+  register: mounts
+
+- name: Reboot to apply
+  ansible.builtin.command: pct reboot {{ ct_id }}
+  delegate_to: sarten
+  when: features is changed or mounts is changed
+
+- name: Back up
+  ansible.builtin.wait_for_connection:
+    delay: 5
+    timeout: 120
+  when: features is changed or mounts is changed

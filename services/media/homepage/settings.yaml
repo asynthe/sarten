@@ -1,0 +1,8 @@
+title: sarten
+theme: dark
+color: slate
+headerStyle: clean
+layout:
+  Media: { style: row, columns: 2 }
+  Arr: { style: row, columns: 4 }
+  Host: { style: row, columns: 1 }

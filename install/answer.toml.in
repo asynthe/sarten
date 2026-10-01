@@ -1,0 +1,22 @@
+[global]
+keyboard             = "en-us"
+country              = "cl"
+fqdn                 = "sarten.lan"
+mailto               = "root@sarten.lan"
+timezone             = "America/Santiago"
+root-password-hashed = "@ROOT_PASSWORD_HASH@"
+root-ssh-keys        = @ROOT_SSH_KEYS@
+
+[network]
+source           = "from-answer"
+cidr             = "192.168.1.135/24"
+gateway          = "192.168.1.1"
+dns              = "200.28.1.130"
+filter.ID_NET_NAME_ONBOARD = "eno1"
+
+[disk-setup]
+filesystem       = "btrfs"
+btrfs.raid       = "raid1"
+btrfs.compress   = "zstd"
+filter.ID_SERIAL = "MB0500GCEHE_*"
+filter-match     = "all"

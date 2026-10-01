@@ -1,0 +1,24 @@
+all:
+  children:
+    proxmox:
+      hosts:
+        sarten:
+          ansible_host: 192.168.1.135
+    guests:
+      hosts:
+        media:
+          ansible_host: 192.168.1.140
+          ct_id: 110
+          ct_features: keyctl=1,nesting=1
+          ct_mounts:
+            - { key: mp0, host: /srv/media, path: /srv/media }
+        monitoring:
+          ansible_host: 192.168.1.141
+          ct_id: 120
+          ct_features: keyctl=1,nesting=1
+        wazuh:
+          ansible_host: 192.168.1.142
+          ct_id: 130
+          ct_features: keyctl=1,nesting=1
+  vars:
+    ansible_user: root

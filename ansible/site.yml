@@ -1,0 +1,46 @@
+- name: sarten
+  hosts: proxmox
+  roles:
+    - { role: base, tags: base }
+    - { role: users, tags: users }
+    - { role: storage, tags: storage }
+    - { role: config, tags: config }
+    - { role: tailscale, tags: tailscale }
+    - { role: exporters, tags: exporters }
+
+- name: Guests, bootstrap
+  hosts: guests
+  gather_facts: false
+  tags: always
+  tasks:
+    - name: python3
+      ansible.builtin.raw: test -e /usr/bin/python3 || (apt-get update -qq && apt-get install -y -qq python3)
+      changed_when: false
+
+- name: media
+  hosts: media
+  vars:
+    media_dir: /opt/media
+  roles:
+    - { role: lxc, tags: [media, lxc] }
+    - { role: docker, tags: [media, docker] }
+    - { role: media, tags: media }
+
+- name: monitoring
+  hosts: monitoring
+  vars:
+    monitoring_dir: /opt/monitoring
+    grafana_dashboards: [1860, 10347]
+  roles:
+    - { role: lxc, tags: [monitoring, lxc] }
+    - { role: docker, tags: [monitoring, docker] }
+    - { role: monitoring, tags: monitoring }
+
+- name: wazuh
+  hosts: wazuh
+  vars:
+    wazuh_dir: /opt/wazuh
+  roles:
+    - { role: lxc, tags: [wazuh, lxc] }
+    - { role: docker, tags: [wazuh, docker] }
+    - { role: wazuh, tags: wazuh }

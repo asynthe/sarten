@@ -1,86 +1,73 @@
-<h1 align="center">flakes</h1>
+# sarten
 
-<p align="center">
-  NixOS for every machine I run, except the laptop.<br>
-  <a href="https://github.com/mightyiam/dendritic">Dendritic</a> ·
-  <a href="https://github.com/serokell/deploy-rs">deploy-rs</a> ·
-  <a href="https://github.com/Mic92/sops-nix">sops-nix</a>
-</p>
+Infrastructure for a single-node Proxmox VE homelab. OpenTofu decides which
+guests exist, Ansible configures the host and everything inside the guests, and
+each guest runs one docker compose stack. Each layer only does its own job.
 
-```
-flakes
-│
-└── sarten ── HP ProLiant ML350e Gen8 v2 · 2× Xeon E5-2407 · 94 GB · ZFS
-    │
-    ├── media ─────── jellyfin      :8096   the library, on tank/media
-    │                 radarr        :7878   movies
-    │                 sonarr        :8989   series + anime
-    │                 lidarr        :8686   music
-    │                 prowlarr      :9696   indexers
-    │                 bazarr        :6767   subtitles
-    │                 qbittorrent   :8080   downloads
-    │
-    ├── archive ───── /srv/archive          mirrored from the laptop, tank/archive
-    │
-    ├── monitoring ── grafana       :3000   dashboards
-    │                 prometheus    :9090   metrics, 90d retention
-    │                 homepage        :80   what runs here and where; nginx in front of :8082
-    │                 docs          :8081   these runbooks, rendered by mdBook
-    │                 node-exporter :9100   host + smartctl metrics
-    │                 smartd                nightly short test, weekly long
-    │
-    ├── security ──── wazuh          :443   SIEM, single-node compose stack
-    │                 wazuh-syslog           p1 ships its journal here
-    │
-    ├── infra ─────── incus         :8443   containers + VMs on the vm mirror, isolated lab bridge
-    │                 docker                for the wazuh stack
-    │                 tailscale             how everything is actually reached
-    │
-    └── ai ────────── hermes                Hermes Agent gateway; dashboard off until it has auth
-```
+| folder | what |
+| --- | --- |
+| `install/` | unattended installer answer file and ISO builder |
+| `tofu/` | guests: size, network, mounts |
+| `ansible/` | host and guest configuration, one role per concern |
+| `config/` | plain files pushed to the host, one folder per app; destinations in `ansible/group_vars/all.yml` |
+| `services/` | one compose stack per guest |
 
-The dashboard and the docs are the two services reachable from the LAN: nginx
-answers on port 80, so `http://sarten` — or `http://192.168.1.135` — lands on the
-dashboard instead of on Wazuh, which holds 443, and `http://sarten:8081` is the
-docs below rendered as a site. Everything else binds wide and the firewall drops
-it on `eno1` — only ssh, those two ports and tailscale's own port are open, so
-the tailnet is the way to the rest.
+| ansible role | does |
+| --- | --- |
+| `base` | repositories, packages, timezone, container template |
+| `users` | admin accounts, ssh keys, Proxmox permissions |
+| `storage` | mounts the data mirror, subvolumes, media layout |
+| `tailscale` | tailnet access, subnet routing, and `tailscale serve` exposing guest ports as `sarten:<port>` (`tailscale_serve` in group_vars) |
+| `config` | copies `config/` onto the host |
+| `lxc` | container feature flags and bind mounts, from the host |
+| `exporters` | node exporter, SMART metrics and smartd on the host |
+| `docker` | docker inside a guest |
+| `media`, `monitoring`, `wazuh` | each guest's compose stack |
+
+| guest | runs |
+| --- | --- |
+| `media` | jellyfin, the arr apps, qbittorrent, homepage |
+| `monitoring` | prometheus, grafana, the Proxmox exporter |
+| `wazuh` | single-node Wazuh manager, indexer and dashboard; takes syslog |
+
+`services/wazuh/` is upstream's single-node stack, trimmed to fit an
+unprivileged container: no memlock, a lower file limit, and only the dashboard,
+agent and syslog ports published.
 
 ## Deploy
 
 ```bash
-nix develop          # deploy-rs, sops, age, ssh-to-age
-deploy .#sarten
+cd ansible && ansible-galaxy collection install -r requirements.yml -p .collections
+ansible-playbook site.yml -l sarten -e upgrade=true
+
+cd ../tofu
+tofu init && tofu apply
+
+cd ../ansible && ansible-playbook site.yml -l guests
 ```
 
-Builds on the workstation, pushes the closure, activates, and rolls back on its
-own if the machine stops answering.
+Secrets live in `ansible/group_vars/all.sops.yaml`, encrypted with sops to the
+age key in `.sops.yaml`; change them with `sops edit`. Ansible loads the file
+through the `community.sops` vars plugin and Tofu through the `carlpett/sops`
+provider, so both read the same file with no wrapper.
 
-## Add a machine
+Tofu authenticates with the Proxmox API token stored there. Tokens cannot set
+LXC feature flags or bind mounts, so the `lxc` role applies those from the
+inventory and Tofu ignores them. Every step is idempotent; re-run the one whose
+folder changed. `-t config` pushes only `config/`.
 
-```nix
-# nix/hosts/<name>/default.nix
-imports = with config.flake.modules.nixos; [ profile-server <name>-hardware boot-uefi ];
+## Once per install
 
-networking.hostName = "<name>";
-system.stateVersion = "26.05";
-sys.deploy.hostname = "<ip or tailnet name>";
-```
+| step | how |
+| --- | --- |
+| root ssh key | `ssh-copy-id root@<host>` |
+| data mirror | `mkfs.btrfs -L sarten-data -d raid1 -m raid1 <disk> <disk>` |
+| tailnet | `tailscale up --advertise-routes=<lan>`, then approve the route |
+| web UI login for admins | `passwd <user>` |
 
-That is the whole registration — the flake finds it by its `host-` prefix and it
-becomes a deploy-rs node too. Users come from [`auth.nix`](auth.nix).
+## Recovery
 
-## Docs
-
-| | |
-|---|---|
-| [DOCS.md](docs/DOCS.md)     | how the repo works: aspects, accounts, secrets, deploying |
-| [SARTEN.md](docs/SARTEN.md) | the ProLiant: install, disks, networking, recovery |
-| [LAYOUT.md](docs/LAYOUT.md) | current disks, pools and networks, and the target |
-| [MEDIA.md](docs/MEDIA.md)   | the media stack and the by-director library |
-| [ARCHIVE.md](docs/ARCHIVE.md) | what the laptop mirrors up to `/srv/archive`, and how |
-| [WAZUH.md](docs/WAZUH.md)   | the SIEM, and what a rebuild cannot reproduce |
-| [LAB.md](docs/LAB.md)       | the SOC lab this box is being built into |
-| [HERMES.md](docs/HERMES.md) | the agent |
-
-<p align="center"><sub>the laptop lives in <a href="https://github.com/asynthe/dots">dots</a></sub></p>
+Both `/` and the data mirror are btrfs RAID1, which refuses to mount with a
+disk missing. For `/`, add `rootflags=degraded` to the kernel line at boot, then
+`btrfs replace` the dead disk. The data mirror is `nofail` and never blocks
+boot; mount it with `-o degraded` and replace the same way.

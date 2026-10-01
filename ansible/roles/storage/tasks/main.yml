@@ -1,0 +1,39 @@
+- name: Find the data filesystem
+  ansible.builtin.command: blkid -L {{ data_label }}
+  register: data_dev
+  changed_when: false
+  failed_when: false
+
+- name: Require the data filesystem
+  ansible.builtin.assert:
+    that: data_dev.rc == 0
+    fail_msg: >-
+      No filesystem labelled {{ data_label }}. Create it by hand first:
+      mkfs.btrfs -L {{ data_label }} -d raid1 -m raid1 /dev/sdX /dev/sdY
+
+- name: Mount it
+  ansible.posix.mount:
+    path: "{{ data_mount }}"
+    src: "LABEL={{ data_label }}"
+    fstype: btrfs
+    opts: noatime,compress=zstd,nofail
+    state: mounted
+
+- name: Existing subvolumes
+  ansible.builtin.command: btrfs subvolume list -o {{ data_mount }}
+  register: subvols
+  changed_when: false
+
+- name: Subvolumes
+  ansible.builtin.command: btrfs subvolume create {{ data_mount }}/{{ item }}
+  loop: "{{ data_subvolumes }}"
+  when: item not in (subvols.stdout_lines | map('split') | map('last') | list)
+
+- name: Media layout
+  ansible.builtin.file:
+    path: "{{ data_mount }}/media/{{ item }}"
+    state: directory
+    owner: "{{ media_owner }}"
+    group: "{{ media_owner }}"
+    mode: "0775"
+  loop: "{{ [''] + media_dirs }}"

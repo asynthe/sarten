@@ -1,0 +1,6 @@
+- resources:
+    cpu: true
+    memory: true
+    disk: /data
+- datetime:
+    format: { dateStyle: short, timeStyle: short, hour12: false }

@@ -1,0 +1,54 @@
+- Media:
+    - Jellyfin:
+        href: http://192.168.1.140:8096
+        icon: jellyfin.png
+        server: local
+        container: jellyfin
+    - qBittorrent:
+        href: http://192.168.1.140:8080
+        icon: qbittorrent.png
+        server: local
+        container: qbittorrent
+
+- Arr:
+    - Sonarr:
+        href: http://192.168.1.140:8989
+        icon: sonarr.png
+        server: local
+        container: sonarr
+    - Radarr:
+        href: http://192.168.1.140:7878
+        icon: radarr.png
+        server: local
+        container: radarr
+    - Lidarr:
+        href: http://192.168.1.140:8686
+        icon: lidarr.png
+        server: local
+        container: lidarr
+    - Prowlarr:
+        href: http://192.168.1.140:9696
+        icon: prowlarr.png
+        server: local
+        container: prowlarr
+    - Bazarr:
+        href: http://192.168.1.140:6767
+        icon: bazarr.png
+        server: local
+        container: bazarr
+
+- Host:
+    - Proxmox:
+        href: https://192.168.1.135:8006
+        icon: proxmox.png
+    - Grafana:
+        href: http://192.168.1.141:3000
+        icon: grafana.png
+        siteMonitor: http://192.168.1.141:3000
+    - Prometheus:
+        href: http://192.168.1.141:9090
+        icon: prometheus.png
+        siteMonitor: http://192.168.1.141:9090
+    - Wazuh:
+        href: https://192.168.1.142
+        icon: wazuh.png

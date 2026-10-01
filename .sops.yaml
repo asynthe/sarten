@@ -1,10 +1,2 @@
-keys:
-  - &admin age1ry5376u65nnf0q9v68vncxmnqdktvelqjge739m7zeqvmcwygqmsrzutsl
-  - &p1    age1hp0m7d3rp7faekqftkjfqy600w38h2mtrhele0unwupnzr0yx3gs6xvvy7   # ~/git/auth/age/keys.txt
-
 creation_rules:
-  - path_regex: secrets/.*\.(ya?ml|json|env)$
-    key_groups:
-      - age:
-          - *admin
-          - *p1
+  - age: age1hp0m7d3rp7faekqftkjfqy600w38h2mtrhele0unwupnzr0yx3gs6xvvy7

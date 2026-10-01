@@ -1,0 +1,36 @@
+- name: Stack directories
+  ansible.builtin.file:
+    path: "{{ media_dir }}/{{ item }}"
+    state: directory
+    owner: "1000"
+    group: "1000"
+    mode: "0755"
+  loop:
+    - config/jellyfin
+    - config/sonarr
+    - config/radarr
+    - config/lidarr
+    - config/prowlarr
+    - config/bazarr
+    - config/qbittorrent
+    - cache/jellyfin
+    - homepage
+
+- name: Compose file
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../services/media/compose.yml"
+    dest: "{{ media_dir }}/compose.yml"
+    mode: "0644"
+
+- name: Homepage config
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../services/media/homepage/"
+    dest: "{{ media_dir }}/homepage/"
+    mode: "0644"
+
+- name: Stack running
+  ansible.builtin.command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ media_dir }}"
+  register: up
+  changed_when: "'Started' in up.stderr or 'Created' in up.stderr or 'Recreated' in up.stderr"

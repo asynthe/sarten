@@ -1,0 +1,57 @@
+timezone: America/Santiago
+
+packages:
+  - btop
+  - curl
+  - fastfetch
+  - git
+  - htop
+  - iotop
+  - lm-sensors
+  - neovim
+  - rsync
+  - smartmontools
+  - tmux
+  - zsh
+
+admins:
+  - name: asynthe
+  - name: kazu
+
+data_label: sarten-data
+data_mount: /srv
+data_subvolumes:
+  - media
+  - archive
+media_dirs:
+  - downloads
+  - movies
+  - series
+  - anime
+  - music
+
+media_owner: 101000
+
+ct_template: debian-13-standard
+ct_storage: local-btrfs
+
+config_files:
+  - { src: ssh/sarten.conf, dest: /etc/ssh/sshd_config.d/10-sarten.conf }
+  - { src: fastfetch/config.jsonc, dest: /etc/xdg/fastfetch/config.jsonc }
+  - { src: fastfetch/logo.txt, dest: /etc/xdg/fastfetch/logo.txt }
+  - { src: tailscale/udp-gro.service, dest: /etc/systemd/system/tailscale-udp-gro.service }
+  - { src: smartd/smartd.conf, dest: /etc/smartd.conf, restart: smartd }
+  - { src: fastfetch/motd.sh, dest: /etc/update-motd.d/10-fastfetch, mode: "0755" }
+
+tailscale_serve:
+  - { port: 3000, guest: media }
+  - { port: 8096, guest: media }
+  - { port: 8989, guest: media }
+  - { port: 7878, guest: media }
+  - { port: 8686, guest: media }
+  - { port: 9696, guest: media }
+  - { port: 6767, guest: media }
+  - { port: 8080, guest: media }
+  - { port: 3001, guest: monitoring, to: 3000 }
+  - { port: 9090, guest: monitoring }
+  - { port: 5601, guest: wazuh, to: 443, scheme: https+insecure }

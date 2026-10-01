@@ -1,0 +1,85 @@
+- name: Stack directories
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    mode: "0755"
+  loop:
+    - { path: data/prometheus, owner: "65534" }
+    - { path: data/grafana, owner: "472" }
+    - { path: dashboards }
+
+- name: Stack files
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../services/monitoring/{{ item }}"
+    dest: "{{ monitoring_dir }}/{{ item }}"
+    mode: "0644"
+  loop: [compose.yml, prometheus.yml, grafana/]
+  register: files
+
+- name: Dashboards
+  ansible.builtin.get_url:
+    url: "https://grafana.com/api/dashboards/{{ item }}/revisions/latest/download"
+    dest: "{{ monitoring_dir }}/dashboards/{{ item }}.json"
+    mode: "0644"
+  loop: "{{ grafana_dashboards }}"
+
+- name: Dashboard datasource
+  ansible.builtin.replace:
+    path: "{{ monitoring_dir }}/dashboards/{{ item }}.json"
+    regexp: '\$\{DS_PROMETHEUS\}'
+    replace: prometheus
+  loop: "{{ grafana_dashboards }}"
+
+- name: PVE exporter credentials
+  ansible.builtin.stat:
+    path: "{{ monitoring_dir }}/pve.yml"
+  register: pve
+
+- name: PVE exporter token
+  when: not pve.stat.exists
+  delegate_to: sarten
+  block:
+    - name: Audit user
+      ansible.builtin.shell: pveum user list --output-format json | grep -q '"prometheus@pve"' || pveum user add prometheus@pve
+      changed_when: false
+
+    - name: Audit role
+      ansible.builtin.command: pveum acl modify / --users prometheus@pve --roles PVEAuditor
+      changed_when: false
+
+    - name: Drop old token
+      ansible.builtin.command: pveum user token remove prometheus@pve exporter
+      failed_when: false
+      changed_when: false
+
+    - name: New token
+      ansible.builtin.command: pveum user token add prometheus@pve exporter --privsep 0 --output-format json
+      register: token
+      no_log: true
+
+- name: PVE exporter config
+  ansible.builtin.copy:
+    dest: "{{ monitoring_dir }}/pve.yml"
+    mode: "0644"
+    content: |
+      default:
+        user: prometheus@pve
+        token_name: exporter
+        token_value: {{ (token.stdout | from_json).value }}
+        verify_ssl: false
+  when: not pve.stat.exists
+  no_log: true
+
+- name: Stack running
+  ansible.builtin.command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ monitoring_dir }}"
+  register: up
+  changed_when: "'Started' in up.stderr or 'Created' in up.stderr or 'Recreated' in up.stderr"
+
+- name: Reload changed config
+  ansible.builtin.command: docker compose restart prometheus grafana
+  args:
+    chdir: "{{ monitoring_dir }}"
+  when: files is changed and up is not changed

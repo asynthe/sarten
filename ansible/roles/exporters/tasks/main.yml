@@ -1,0 +1,25 @@
+- name: Exporters
+  ansible.builtin.apt:
+    name:
+      - prometheus-node-exporter
+      - prometheus-node-exporter-collectors
+      - nvme-cli
+      - jq
+
+- name: node_exporter
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter
+    enabled: true
+    state: started
+
+- name: SMART collector
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter-smartmon.timer
+    enabled: true
+    state: started
+
+- name: smartd
+  ansible.builtin.systemd:
+    name: smartd
+    enabled: true
+    state: started

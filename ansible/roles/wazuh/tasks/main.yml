@@ -1,0 +1,25 @@
+- name: Stack files
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../services/wazuh/"
+    dest: "{{ wazuh_dir }}/"
+    mode: "0644"
+  register: files
+
+- name: Certificates
+  ansible.builtin.command: docker compose -f generate-certs.yml run --rm generator
+  args:
+    chdir: "{{ wazuh_dir }}"
+    creates: "{{ wazuh_dir }}/config/wazuh_indexer_ssl_certs/root-ca.pem"
+
+- name: Stack running
+  ansible.builtin.command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ wazuh_dir }}"
+  register: up
+  changed_when: "'Started' in up.stderr or 'Created' in up.stderr or 'Recreated' in up.stderr"
+
+- name: Reload changed config
+  ansible.builtin.command: docker compose restart
+  args:
+    chdir: "{{ wazuh_dir }}"
+  when: files is changed and up is not changed

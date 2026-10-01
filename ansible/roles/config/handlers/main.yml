@@ -1,0 +1,9 @@
+- name: Reload sshd
+  ansible.builtin.command: /usr/sbin/sshd -t
+  changed_when: false
+  notify: Reload ssh unit
+
+- name: Reload ssh unit
+  ansible.builtin.systemd:
+    name: ssh
+    state: reloaded

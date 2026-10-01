@@ -1,0 +1,39 @@
+- name: Config directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ config_files | map(attribute='dest') | map('dirname') | unique }}"
+
+- name: Config files
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../config/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0644') }}"
+  loop: "{{ config_files }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  register: copied
+  notify: Reload sshd
+
+- name: Restart changed services
+  ansible.builtin.systemd:
+    name: "{{ item.item.restart }}"
+    state: restarted
+  loop: "{{ copied.results | selectattr('changed') | selectattr('item.restart', 'defined') }}"
+  loop_control:
+    label: "{{ item.item.restart }}"
+
+- name: Empty motd
+  ansible.builtin.copy:
+    content: ""
+    dest: /etc/motd
+    mode: "0644"
+
+- name: Stock uname motd off
+  ansible.builtin.file:
+    path: /etc/update-motd.d/10-uname
+    mode: "0644"
+  failed_when: false

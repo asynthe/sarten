@@ -1,0 +1,54 @@
+- name: sudo
+  ansible.builtin.apt:
+    name: sudo
+
+- name: Admin accounts
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    groups: sudo
+    append: true
+    shell: /usr/bin/zsh
+    password: "!"
+    update_password: on_create
+  loop: "{{ admins }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Authorized keys
+  ansible.posix.authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ ssh_keys[item.name] | join('\n') }}"
+    exclusive: true
+  loop: "{{ admins }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Passwordless sudo for admins
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/admins
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+    content: |
+      {% for a in admins %}
+      {{ a.name }} ALL=(ALL:ALL) NOPASSWD: ALL
+      {% endfor %}
+
+- name: Existing PVE users
+  ansible.builtin.command: pveum user list --output-format json
+  register: pve_users
+  changed_when: false
+  check_mode: false
+
+- name: PVE PAM users
+  ansible.builtin.command: pveum user add {{ item.name }}@pam
+  loop: "{{ admins }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: (item.name ~ '@pam') not in (pve_users.stdout | from_json | map(attribute='userid'))
+
+- name: PVE Administrator role
+  ansible.builtin.command: pveum acl modify / --users {{ item.name }}@pam --roles Administrator
+  loop: "{{ admins }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: false
