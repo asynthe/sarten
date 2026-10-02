@@ -28,9 +28,40 @@
     dest: "{{ media_dir }}/homepage/"
     mode: "0644"
 
+- name: VPN settings present
+  ansible.builtin.assert:
+    that: vpn is mapping and media_password is defined
+    fail_msg: Add vpn (gluetun env vars) and media_password to group_vars/all.sops.yaml with sops edit.
+
+- name: VPN env
+  ansible.builtin.copy:
+    dest: "{{ media_dir }}/vpn.env"
+    mode: "0600"
+    content: |
+      {% for k, v in vpn.items() %}
+      {{ k }}={{ v }}
+      {% endfor %}
+  no_log: true
+
 - name: Stack running
   ansible.builtin.command: docker compose up -d --remove-orphans
   args:
     chdir: "{{ media_dir }}"
   register: up
   changed_when: "'Started' in up.stderr or 'Created' in up.stderr or 'Recreated' in up.stderr"
+
+- name: qBittorrent
+  ansible.builtin.import_tasks: qbittorrent.yml
+
+- name: Arr apps
+  ansible.builtin.include_tasks: arr.yml
+  loop: "{{ arrs }}"
+  loop_control:
+    loop_var: arr
+    label: "{{ arr.name }}"
+
+- name: Prowlarr
+  ansible.builtin.import_tasks: prowlarr.yml
+
+- name: Bazarr
+  ansible.builtin.import_tasks: bazarr.yml

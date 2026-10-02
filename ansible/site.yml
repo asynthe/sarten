@@ -21,6 +21,29 @@
   hosts: media
   vars:
     media_dir: /opt/media
+    media_user: asynthe
+    arrs:
+      - { name: sonarr, port: 8989, api: v3, category: tvCategory, roots: [/data/series, /data/anime] }
+      - { name: radarr, port: 7878, api: v3, category: movieCategory, roots: [/data/movies] }
+      - { name: lidarr, port: 8686, api: v1, category: musicCategory, roots: [/data/music] }
+      - { name: prowlarr, port: 9696, api: v1 }
+    qbittorrent_settings:
+      - { section: BitTorrent, option: 'Session\DefaultSavePath', value: /data/downloads/ }
+      - { section: BitTorrent, option: 'Session\TempPath', value: /data/downloads/incomplete/ }
+      - { section: BitTorrent, option: 'Session\TempPathEnabled', value: "true" }
+      - { section: BitTorrent, option: 'Session\DisableAutoTMMByDefault', value: "false" }
+      - { section: BitTorrent, option: 'Session\Interface', value: tun0 }
+      - { section: BitTorrent, option: 'Session\InterfaceName', value: tun0 }
+      - { section: Preferences, option: 'Downloads\SavePath', value: /data/downloads/ }
+      - { section: Preferences, option: 'Downloads\TempPath', value: /data/downloads/incomplete/ }
+      - { section: Preferences, option: 'WebUI\AuthSubnetWhitelistEnabled', value: "true" }
+      - { section: Preferences, option: 'WebUI\AuthSubnetWhitelist', value: "192.168.1.0/24, 172.16.0.0/12" }
+    indexers:
+      - { definition: nyaasi, name: Nyaa.si }
+      - { definition: 1337x, name: 1337x, flaresolverr: true }
+      - { definition: eztv, name: EZTV, flaresolverr: true }
+      - { definition: thepiratebay, name: The Pirate Bay }
+      - { definition: yts, name: YTS }
   roles:
     - { role: lxc, tags: [media, lxc] }
     - { role: docker, tags: [media, docker] }

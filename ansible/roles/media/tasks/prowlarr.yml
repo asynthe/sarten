@@ -1,0 +1,95 @@
+- name: Prowlarr state
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9696/api/v1/{{ item }}"
+    headers: { X-Api-Key: "{{ arr_keys.prowlarr }}" }
+  loop: [tag, indexerProxy, applications, indexer]
+  register: prowlarr
+
+- name: Prowlarr current
+  ansible.builtin.set_fact:
+    prowlarr_tags: "{{ prowlarr.results[0].json | items2dict(key_name='label', value_name='id') }}"
+    prowlarr_proxies: "{{ prowlarr.results[1].json | map(attribute='name') }}"
+    prowlarr_apps: "{{ prowlarr.results[2].json | map(attribute='name') }}"
+    prowlarr_indexers: "{{ prowlarr.results[3].json | map(attribute='definitionName') }}"
+
+- name: FlareSolverr tag
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9696/api/v1/tag
+    method: POST
+    headers: { X-Api-Key: "{{ arr_keys.prowlarr }}" }
+    body_format: json
+    body: { label: flaresolverr }
+    status_code: 201
+  register: prowlarr_tag
+  when: "'flaresolverr' not in prowlarr_tags"
+  changed_when: true
+
+- name: FlareSolverr tag id
+  ansible.builtin.set_fact:
+    flaresolverr_tag: "{{ prowlarr_tags.flaresolverr | default(prowlarr_tag.json.id | default(0)) }}"
+
+- name: FlareSolverr proxy
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9696/api/v1/indexerProxy?forceSave=true
+    method: POST
+    headers: { X-Api-Key: "{{ arr_keys.prowlarr }}" }
+    body_format: json
+    body:
+      name: FlareSolverr
+      implementation: FlareSolverr
+      configContract: FlareSolverrSettings
+      tags: ["{{ flaresolverr_tag | int }}"]
+      fields:
+        - { name: host, value: "http://flaresolverr:8191/" }
+        - { name: requestTimeout, value: 60 }
+    status_code: 201
+  when: "'FlareSolverr' not in prowlarr_proxies"
+  changed_when: true
+
+- name: Prowlarr apps
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9696/api/v1/applications?forceSave=true
+    method: POST
+    headers: { X-Api-Key: "{{ arr_keys.prowlarr }}" }
+    body_format: json
+    body:
+      name: "{{ item.name | capitalize }}"
+      syncLevel: fullSync
+      implementation: "{{ item.name | capitalize }}"
+      configContract: "{{ item.name | capitalize }}Settings"
+      tags: []
+      fields:
+        - { name: prowlarrUrl, value: "http://prowlarr:9696" }
+        - { name: baseUrl, value: "http://{{ item.name }}:{{ item.port }}" }
+        - { name: apiKey, value: "{{ arr_keys[item.name] }}" }
+    status_code: 201
+  loop: "{{ arrs | selectattr('category', 'defined') }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name | capitalize not in prowlarr_apps
+  changed_when: true
+  no_log: true
+
+- name: Indexers
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9696/api/v1/indexer?forceSave=true
+    method: POST
+    headers: { X-Api-Key: "{{ arr_keys.prowlarr }}" }
+    body_format: json
+    body:
+      name: "{{ item.name }}"
+      enable: true
+      appProfileId: 1
+      priority: 25
+      protocol: torrent
+      implementation: Cardigann
+      configContract: CardigannSettings
+      tags: "{{ [flaresolverr_tag | int] if item.flaresolverr | default(false) else [] }}"
+      fields:
+        - { name: definitionFile, value: "{{ item.definition }}" }
+    status_code: 201
+  loop: "{{ indexers }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.definition not in prowlarr_indexers
+  changed_when: true

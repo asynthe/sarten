@@ -59,13 +59,23 @@ services:
       - ./config/bazarr:/config
       - /srv/media:/data
 
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    restart: unless-stopped
+    cap_add: [NET_ADMIN]
+    devices: [/dev/net/tun:/dev/net/tun]
+    ports: ["8080:8080"]
+    env_file: vpn.env
+    environment:
+      TZ: America/Santiago
+
   qbittorrent:
     <<: *arr
     image: lscr.io/linuxserver/qbittorrent:latest
-    ports:
-      - "8080:8080"
-      - "6881:6881"
-      - "6881:6881/udp"
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
     environment:
       PUID: "1000"
       PGID: "1000"
@@ -75,6 +85,12 @@ services:
     volumes:
       - ./config/qbittorrent:/config
       - /srv/media:/data
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    environment:
+      TZ: America/Santiago
 
   homepage:
     image: ghcr.io/gethomepage/homepage:latest

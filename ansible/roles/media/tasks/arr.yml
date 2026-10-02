@@ -1,0 +1,102 @@
+- name: "{{ arr.name }} config written"
+  ansible.builtin.wait_for:
+    path: "{{ media_dir }}/config/{{ arr.name }}/config.xml"
+    search_regex: ApiKey
+    timeout: 180
+
+- name: "{{ arr.name }} config"
+  ansible.builtin.slurp:
+    path: "{{ media_dir }}/config/{{ arr.name }}/config.xml"
+  register: arr_xml
+
+- name: "{{ arr.name }} API key"
+  ansible.builtin.set_fact:
+    arr_keys: "{{ arr_keys | default({}) | combine({arr.name: arr_xml.content | b64decode | regex_search('<ApiKey>(\\w+)</ApiKey>', '\\1') | first}) }}"
+    arr_url: "http://127.0.0.1:{{ arr.port }}/api/{{ arr.api }}"
+
+- name: "{{ arr.name }} host settings"
+  ansible.builtin.uri:
+    url: "{{ arr_url }}/config/host"
+    headers: { X-Api-Key: "{{ arr_keys[arr.name] }}" }
+  register: arr_host
+  retries: 30
+  delay: 5
+  until: arr_host.status == 200
+
+- name: "{{ arr.name }} login"
+  ansible.builtin.uri:
+    url: "{{ arr_url }}/config/host/{{ arr_host.json.id }}"
+    method: PUT
+    headers: { X-Api-Key: "{{ arr_keys[arr.name] }}" }
+    body_format: json
+    body: >-
+      {{ arr_host.json | combine({
+           'authenticationMethod': 'forms',
+           'authenticationRequired': 'disabledForLocalAddresses',
+           'username': media_user,
+           'password': media_password,
+           'passwordConfirmation': media_password}) }}
+    status_code: [200, 202]
+  when: >-
+    arr_host.json.authenticationMethod != 'forms'
+    or arr_host.json.authenticationRequired != 'disabledForLocalAddresses'
+    or arr_host.json.username != media_user
+  changed_when: true
+  no_log: true
+
+- name: "{{ arr.name }} root folders present"
+  ansible.builtin.uri:
+    url: "{{ arr_url }}/rootfolder"
+    headers: { X-Api-Key: "{{ arr_keys[arr.name] }}" }
+  register: arr_roots
+  when: arr.roots is defined
+
+- name: "{{ arr.name }} root folders"
+  ansible.builtin.uri:
+    url: "{{ arr_url }}/rootfolder"
+    method: POST
+    headers: { X-Api-Key: "{{ arr_keys[arr.name] }}" }
+    body_format: json
+    body: >-
+      {{ {'path': item} | combine({
+           'name': item | basename,
+           'defaultQualityProfileId': 1,
+           'defaultMetadataProfileId': 1,
+           'defaultMonitorOption': 'all',
+           'defaultNewItemMonitorOption': 'all',
+           'defaultTags': []} if arr.name == 'lidarr' else {}) }}
+    status_code: 201
+  loop: "{{ arr.roots | default([]) }}"
+  when: item not in (arr_roots.json | map(attribute='path') | map('regex_replace', '/$', ''))
+  changed_when: true
+
+- name: "{{ arr.name }} download clients present"
+  ansible.builtin.uri:
+    url: "{{ arr_url }}/downloadclient"
+    headers: { X-Api-Key: "{{ arr_keys[arr.name] }}" }
+  register: arr_clients
+  when: arr.category is defined
+
+- name: "{{ arr.name }} qBittorrent"
+  ansible.builtin.uri:
+    url: "{{ arr_url }}/downloadclient?forceSave=true"
+    method: POST
+    headers: { X-Api-Key: "{{ arr_keys[arr.name] }}" }
+    body_format: json
+    body:
+      name: qBittorrent
+      enable: true
+      protocol: torrent
+      priority: 1
+      implementation: QBittorrent
+      configContract: QBittorrentSettings
+      tags: []
+      fields:
+        - { name: host, value: gluetun }
+        - { name: port, value: 8080 }
+        - { name: "{{ arr.category }}", value: "{{ arr.name }}" }
+    status_code: 201
+  when:
+    - arr.category is defined
+    - "'qBittorrent' not in (arr_clients.json | map(attribute='name'))"
+  changed_when: true

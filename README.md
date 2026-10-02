@@ -26,9 +26,18 @@ each guest runs one docker compose stack. Each layer only does its own job.
 
 | guest | runs |
 | --- | --- |
-| `media` | jellyfin, the arr apps, qbittorrent, homepage |
+| `media` | jellyfin, the arr apps, qbittorrent behind gluetun, flaresolverr, homepage |
 | `monitoring` | prometheus, grafana, the Proxmox exporter |
 | `wazuh` | single-node Wazuh manager, indexer and dashboard; takes syslog |
+
+The `media` role also wires the apps together through their APIs: qBittorrent
+saves to `/data/downloads/<category>` on the same subvolume as the library, so
+imports are hardlinks; each arr gets its root folders and qBittorrent as
+download client; Prowlarr syncs its indexers to them, sending Cloudflare sites
+through FlareSolverr; Bazarr reads Sonarr and Radarr. Each step only adds what
+is missing, so changes made in the UIs stay. Logins are `media_user` with
+`media_password`, skipped from local addresses; qBittorrent's traffic leaves
+only through the VPN in `vpn`, a map of gluetun environment variables.
 
 `services/wazuh/` is upstream's single-node stack, trimmed to fit an
 unprivileged container: no memlock, a lower file limit, and only the dashboard,

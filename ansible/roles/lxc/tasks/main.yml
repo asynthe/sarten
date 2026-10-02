@@ -21,13 +21,23 @@
     (item.key ~ ': ' ~ item.host ~ ',mp=' ~ item.path) not in ct.stdout
   register: mounts
 
+- name: Devices
+  ansible.builtin.command: pct set {{ ct_id }} -{{ item.key }} {{ item.path }}
+  loop: "{{ ct_devices | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  delegate_to: sarten
+  when: >-
+    (item.key ~ ': ' ~ item.path) not in ct.stdout
+  register: devices
+
 - name: Reboot to apply
   ansible.builtin.command: pct reboot {{ ct_id }}
   delegate_to: sarten
-  when: features is changed or mounts is changed
+  when: features is changed or mounts is changed or devices is changed
 
 - name: Back up
   ansible.builtin.wait_for_connection:
     delay: 5
     timeout: 120
-  when: features is changed or mounts is changed
+  when: features is changed or mounts is changed or devices is changed

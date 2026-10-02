@@ -1,0 +1,44 @@
+- name: Bazarr config written
+  ansible.builtin.wait_for:
+    path: "{{ media_dir }}/config/bazarr/config/config.yaml"
+    search_regex: "^sonarr:"
+    timeout: 180
+
+- name: Bazarr config
+  ansible.builtin.slurp:
+    path: "{{ media_dir }}/config/bazarr/config/config.yaml"
+  register: bazarr_raw
+  no_log: true
+
+- name: Bazarr wanted config
+  ansible.builtin.set_fact:
+    bazarr_now: "{{ bazarr_raw.content | b64decode | from_yaml }}"
+    bazarr_want: >-
+      {{ bazarr_raw.content | b64decode | from_yaml | combine({
+           'general': {'use_sonarr': true, 'use_radarr': true},
+           'sonarr': {'ip': 'sonarr', 'port': 8989, 'apikey': arr_keys.sonarr},
+           'radarr': {'ip': 'radarr', 'port': 7878, 'apikey': arr_keys.radarr}},
+         recursive=true) }}
+  no_log: true
+
+- name: Bazarr linked to Sonarr and Radarr
+  when: bazarr_now != bazarr_want
+  block:
+    - name: Stop Bazarr
+      ansible.builtin.command: docker compose stop bazarr
+      args:
+        chdir: "{{ media_dir }}"
+
+    - name: Write config
+      ansible.builtin.copy:
+        dest: "{{ media_dir }}/config/bazarr/config/config.yaml"
+        content: "{{ bazarr_want | to_nice_yaml(indent=2, width=1000) }}"
+        owner: "1000"
+        group: "1000"
+        mode: "0644"
+      no_log: true
+
+    - name: Start Bazarr
+      ansible.builtin.command: docker compose up -d bazarr
+      args:
+        chdir: "{{ media_dir }}"

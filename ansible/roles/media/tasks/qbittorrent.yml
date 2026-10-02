@@ -1,0 +1,60 @@
+- name: qBittorrent config written
+  ansible.builtin.wait_for:
+    path: "{{ media_dir }}/config/qbittorrent/qBittorrent/qBittorrent.conf"
+    search_regex: WebUI
+    timeout: 180
+
+- name: qBittorrent settings drift
+  community.general.ini_file:
+    path: "{{ media_dir }}/config/qbittorrent/qBittorrent/qBittorrent.conf"
+    section: "{{ item.section }}"
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    no_extra_spaces: true
+  loop: "{{ qbittorrent_settings }}"
+  check_mode: true
+  register: qb_drift
+
+- name: qBittorrent settings
+  when: qb_drift is changed
+  block:
+    - name: Stop qBittorrent
+      ansible.builtin.command: docker compose stop qbittorrent
+      args:
+        chdir: "{{ media_dir }}"
+
+    - name: Write settings
+      community.general.ini_file:
+        path: "{{ media_dir }}/config/qbittorrent/qBittorrent/qBittorrent.conf"
+        section: "{{ item.section }}"
+        option: "{{ item.option }}"
+        value: "{{ item.value }}"
+        no_extra_spaces: true
+        owner: "1000"
+        group: "1000"
+      loop: "{{ qbittorrent_settings }}"
+
+    - name: Start qBittorrent
+      ansible.builtin.command: docker compose up -d qbittorrent
+      args:
+        chdir: "{{ media_dir }}"
+
+- name: qBittorrent config
+  ansible.builtin.slurp:
+    path: "{{ media_dir }}/config/qbittorrent/qBittorrent/qBittorrent.conf"
+  register: qb_conf
+
+- name: qBittorrent login
+  when: "'Password_PBKDF2' not in (qb_conf.content | b64decode)"
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8080/api/v2/app/setPreferences
+    method: POST
+    body_format: form-urlencoded
+    body:
+      json: "{{ {'web_ui_username': media_user, 'web_ui_password': media_password} | to_json }}"
+  register: qb_login
+  retries: 30
+  delay: 5
+  until: qb_login.status == 200
+  changed_when: true
+  no_log: true
