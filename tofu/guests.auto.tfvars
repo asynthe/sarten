@@ -9,7 +9,7 @@ containers = {
     tags     = ["docker", "media"]
     notes    = <<-EOT
       # media
-      docker compose, `/opt/media` · source: `services/media` in the sarten repo
+      docker compose · source: `services/media` in the sarten repo
 
       | service | |
       | --- | --- |
@@ -34,7 +34,7 @@ containers = {
     tags     = ["docker", "monitoring"]
     notes    = <<-EOT
       # monitoring
-      docker compose, `/opt/monitoring` · source: `services/monitoring` in the sarten repo
+      docker compose · source: `services/monitoring` in the sarten repo
 
       | service | |
       | --- | --- |
@@ -53,7 +53,7 @@ containers = {
     tags     = ["docker", "security"]
     notes    = <<-EOT
       # wazuh
-      docker compose, `/opt/wazuh` · source: `services/wazuh` in the sarten repo
+      docker compose · source: `services/wazuh` in the sarten repo
 
       | service | |
       | --- | --- |

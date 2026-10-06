@@ -1,9 +1,20 @@
+- name: Secrets present
+  ansible.builtin.assert:
+    that:
+      - vpn is mapping
+      - media_password is defined
+      - jellyfin_users is mapping
+      - jellyfin_admin | lower not in (jellyfin_users | map("lower"))
+    fail_msg: >-
+      Add vpn (gluetun env vars), media_password and jellyfin_users (name: password, {} for none)
+      to group_vars/all.sops.yaml with sops edit; jellyfin_users must not include jellyfin_admin.
+
 - name: Stack directories
   ansible.builtin.file:
     path: "{{ media_dir }}/{{ item }}"
     state: directory
-    owner: "1000"
-    group: "1000"
+    owner: "{{ media_uid }}"
+    group: "{{ media_uid }}"
     mode: "0755"
   loop:
     - config/jellyfin
@@ -13,8 +24,17 @@
     - config/prowlarr
     - config/bazarr
     - config/qbittorrent
+    - config/recyclarr
     - cache/jellyfin
     - homepage
+
+- name: Recycle bin
+  ansible.builtin.file:
+    path: "{{ media_root }}/.recycle/radarr"
+    state: directory
+    owner: "{{ media_uid }}"
+    group: "{{ media_uid }}"
+    mode: "0775"
 
 - name: Compose file
   ansible.builtin.copy:
@@ -22,16 +42,17 @@
     dest: "{{ media_dir }}/compose.yml"
     mode: "0644"
 
-- name: Homepage config
+- name: Compose env
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../services/media/homepage/"
-    dest: "{{ media_dir }}/homepage/"
+    dest: "{{ media_dir }}/.env"
     mode: "0644"
-
-- name: VPN settings present
-  ansible.builtin.assert:
-    that: vpn is mapping and media_password is defined
-    fail_msg: Add vpn (gluetun env vars) and media_password to group_vars/all.sops.yaml with sops edit.
+    content: |
+      MEDIA_ROOT={{ media_root }}
+      PUID={{ media_uid }}
+      PGID={{ media_uid }}
+      TZ={{ timezone }}
+      LAN_SUBNET={{ lan_subnet }}
+      HOMEPAGE_ALLOWED_HOSTS={{ media_hosts | map('regex_replace', '$', ':3000') | join(',') }}
 
 - name: VPN env
   ansible.builtin.copy:
@@ -42,6 +63,12 @@
       {{ k }}={{ v }}
       {% endfor %}
   no_log: true
+
+- name: Homepage config
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../services/media/homepage/"
+    dest: "{{ media_dir }}/homepage/"
+    mode: "0644"
 
 - name: Stack running
   ansible.builtin.command: docker compose up -d --remove-orphans
@@ -60,8 +87,14 @@
     loop_var: arr
     label: "{{ arr.name }}"
 
+- name: Recyclarr
+  ansible.builtin.import_tasks: recyclarr.yml
+
 - name: Prowlarr
   ansible.builtin.import_tasks: prowlarr.yml
 
 - name: Bazarr
   ansible.builtin.import_tasks: bazarr.yml
+
+- name: Jellyfin
+  ansible.builtin.import_tasks: jellyfin.yml

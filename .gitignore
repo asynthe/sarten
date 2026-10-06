@@ -13,3 +13,5 @@ ansible/.collections/
 tofu/.terraform/
 tofu/*.tfstate
 tofu/*.tfstate.*
+
+send/

@@ -30,8 +30,8 @@
         option: "{{ item.option }}"
         value: "{{ item.value }}"
         no_extra_spaces: true
-        owner: "1000"
-        group: "1000"
+        owner: "{{ media_uid }}"
+        group: "{{ media_uid }}"
       loop: "{{ qbittorrent_settings }}"
 
     - name: Start qBittorrent

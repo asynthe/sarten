@@ -11,7 +11,7 @@ all:
           ct_id: 110
           ct_features: keyctl=1,nesting=1
           ct_mounts:
-            - { key: mp0, host: /srv/media, path: /srv/media }
+            - { key: mp0, host: "{{ media_root }}", path: "{{ media_root }}" }
           ct_devices:
             - { key: dev0, path: /dev/net/tun }
         monitoring:

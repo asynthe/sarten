@@ -35,12 +35,14 @@
            'authenticationRequired': 'disabledForLocalAddresses',
            'username': media_user,
            'password': media_password,
-           'passwordConfirmation': media_password}) }}
+           'passwordConfirmation': media_password}
+         | combine({'allowedHosts': (media_hosts + [arr.name]) | join(',')} if arr_host.json.allowedHosts is defined else {})) }}
     status_code: [200, 202]
   when: >-
     arr_host.json.authenticationMethod != 'forms'
     or arr_host.json.authenticationRequired != 'disabledForLocalAddresses'
     or arr_host.json.username != media_user
+    or arr_host.json.allowedHosts | default('-') == ''
   changed_when: true
   no_log: true
 
@@ -100,3 +102,7 @@
     - arr.category is defined
     - "'qBittorrent' not in (arr_clients.json | map(attribute='name'))"
   changed_when: true
+
+- name: "{{ arr.name }} media management"
+  ansible.builtin.include_tasks: arr_media.yml
+  when: arr.media_management is defined

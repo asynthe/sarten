@@ -20,13 +20,44 @@
 - name: media
   hosts: media
   vars:
-    media_dir: /opt/media
     media_user: asynthe
+    jellyfin_admin: admin
+    media_hosts: "{{ [ansible_host, inventory_hostname, inventory_hostname ~ '.lan', 'localhost', '127.0.0.1', groups.proxmox | first, (groups.proxmox | first) ~ '.' ~ tailnet] }}"
     arrs:
-      - { name: sonarr, port: 8989, api: v3, category: tvCategory, roots: [/data/series, /data/anime] }
-      - { name: radarr, port: 7878, api: v3, category: movieCategory, roots: [/data/movies] }
+      - name: sonarr
+        port: 8989
+        api: v3
+        category: tvCategory
+        roots: [/data/series]
+        media_management:
+          copyUsingHardlinks: true
+          importExtraFiles: false
+          deleteEmptyFolders: true
+      - name: radarr
+        port: 7878
+        api: v3
+        category: movieCategory
+        roots: [/data/movies]
+        media_management:
+          copyUsingHardlinks: true
+          importExtraFiles: false
+          deleteEmptyFolders: true
+          recycleBin: /data/.recycle/radarr
+          recycleBinCleanupDays: 14
       - { name: lidarr, port: 8686, api: v1, category: musicCategory, roots: [/data/music] }
       - { name: prowlarr, port: 9696, api: v1 }
+    movie_profile: HD Bluray + WEB
+    movie_max_gb: 5
+    radarr_formats:
+      - name: Over size limit
+        score: -10000
+        specifications:
+          - { name: Size, implementation: SizeSpecification, fields: { min: "{{ movie_max_gb }}", max: 1000 } }
+      - name: YTS
+        score: 25000
+        specifications:
+          - { name: Group, implementation: ReleaseGroupSpecification, fields: { value: '^(YTS|YIFY)' } }
+          - { name: Title, implementation: ReleaseTitleSpecification, fields: { value: '\b(YTS|YIFY)\b' } }
     qbittorrent_settings:
       - { section: BitTorrent, option: 'Session\DefaultSavePath', value: /data/downloads/ }
       - { section: BitTorrent, option: 'Session\TempPath', value: /data/downloads/incomplete/ }
@@ -37,13 +68,29 @@
       - { section: Preferences, option: 'Downloads\SavePath', value: /data/downloads/ }
       - { section: Preferences, option: 'Downloads\TempPath', value: /data/downloads/incomplete/ }
       - { section: Preferences, option: 'WebUI\AuthSubnetWhitelistEnabled', value: "true" }
-      - { section: Preferences, option: 'WebUI\AuthSubnetWhitelist', value: "192.168.1.0/24, 172.16.0.0/12" }
+      - { section: Preferences, option: 'WebUI\AuthSubnetWhitelist', value: "{{ lan_subnet }}, 172.16.0.0/12" }
     indexers:
       - { definition: nyaasi, name: Nyaa.si }
       - { definition: 1337x, name: 1337x, flaresolverr: true }
       - { definition: eztv, name: EZTV, flaresolverr: true }
       - { definition: thepiratebay, name: The Pirate Bay }
       - { definition: yts, name: YTS }
+    subtitle_languages: [en, es, ja]
+    subtitle_providers: [embeddedsubtitles, yifysubtitles, tvsubtitles, subtitulamostv]
+    jellyfin_libraries:
+      - { name: Movies, type: movies, paths: [/data/movies] }
+      - { name: Shows, type: tvshows, paths: [/data/series] }
+      - { name: Series Latino, type: tvshows, paths: [/data/series-es], language: es-MX, country: MX }
+    jellyfin_repositories:
+      - { Name: IAmParadox27, Url: "https://www.iamparadox.dev/jellyfin/plugins/manifest.json" }
+      - { Name: Intro Skipper, Url: "https://intro-skipper.org/manifest.json" }
+      - { Name: Auto Collections, Url: "https://raw.githubusercontent.com/KeksBombe/jellyfin-plugin-auto-collections/refs/heads/main/manifest.json" }
+    jellyfin_plugins: [File Transformation, Media Bar, Intro Skipper, Auto Collections]
+    jellyfin_collections:
+      - { name: Stanley Kubrick, by: Director }
+      - { name: Ridley Scott, by: Director }
+      - { name: Martin Scorsese, by: Director }
+      - { name: Sacha Baron Cohen, by: Actor }
   roles:
     - { role: lxc, tags: [media, lxc] }
     - { role: docker, tags: [media, docker] }
@@ -52,7 +99,6 @@
 - name: monitoring
   hosts: monitoring
   vars:
-    monitoring_dir: /opt/monitoring
     grafana_dashboards: [1860, 10347]
   roles:
     - { role: lxc, tags: [monitoring, lxc] }
@@ -61,8 +107,6 @@
 
 - name: wazuh
   hosts: wazuh
-  vars:
-    wazuh_dir: /opt/wazuh
   roles:
     - { role: lxc, tags: [wazuh, lxc] }
     - { role: docker, tags: [wazuh, docker] }

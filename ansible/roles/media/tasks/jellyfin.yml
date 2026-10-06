@@ -1,0 +1,220 @@
+- name: Jellyfin up
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/System/Info/Public
+  register: jf_info
+  retries: 30
+  delay: 5
+  until: jf_info.status == 200
+
+- name: Jellyfin first run
+  when: not jf_info.json.StartupWizardCompleted
+  block:
+    - name: Startup language
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8096/Startup/Configuration
+        method: POST
+        body_format: json
+        body: { UICulture: en-US, MetadataCountryCode: US, PreferredMetadataLanguage: en }
+        status_code: [200, 204]
+
+    - name: Startup user created
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8096/Startup/User
+
+    - name: Startup user
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8096/Startup/User
+        method: POST
+        body_format: json
+        body: { Name: "{{ jellyfin_admin }}", Password: "{{ media_password }}" }
+        status_code: [200, 204]
+      no_log: true
+
+    - name: Startup remote access
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8096/Startup/RemoteAccess
+        method: POST
+        body_format: json
+        body: { EnableRemoteAccess: true, EnableAutomaticPortMapping: false }
+        status_code: [200, 204]
+
+    - name: Startup complete
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8096/Startup/Complete
+        method: POST
+        status_code: [200, 204]
+
+- name: Jellyfin login
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Users/AuthenticateByName
+    method: POST
+    headers:
+      Authorization: MediaBrowser Client="sarten", Device="ansible", DeviceId="ansible", Version="1"
+    body_format: json
+    body: { Username: "{{ jellyfin_admin }}", Pw: "{{ media_password }}" }
+  register: jf_auth
+  no_log: true
+
+- name: Jellyfin token
+  ansible.builtin.set_fact:
+    jf_headers:
+      Authorization: MediaBrowser Client="sarten", Device="ansible", DeviceId="ansible", Version="1", Token="{{ jf_auth.json.AccessToken }}"
+  no_log: true
+
+- name: Jellyfin libraries present
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Library/VirtualFolders
+    headers: "{{ jf_headers }}"
+  register: jf_libraries
+
+- name: Jellyfin libraries
+  ansible.builtin.uri:
+    url: >-
+      http://127.0.0.1:8096/Library/VirtualFolders?name={{ item.name | urlencode }}&collectionType={{ item.type }}&refreshLibrary=false&{{ item.paths | map('urlencode') | map('regex_replace', '^', 'paths=') | join('&') }}
+    method: POST
+    timeout: 120
+    headers: "{{ jf_headers }}"
+    body_format: json
+    body:
+      LibraryOptions:
+        PreferredMetadataLanguage: "{{ item.language | default(omit) }}"
+        MetadataCountryCode: "{{ item.country | default(omit) }}"
+    status_code: 204
+  loop: "{{ jellyfin_libraries }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name not in (jf_libraries.json | map(attribute='Name'))
+  changed_when: true
+  register: jf_added
+
+- name: Jellyfin scan
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Library/Refresh
+    method: POST
+    headers: "{{ jf_headers }}"
+    status_code: 204
+  when: jf_added is changed
+
+- name: Jellyfin users present
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Users
+    headers: "{{ jf_headers }}"
+  register: jf_users
+
+- name: Jellyfin users wanted
+  ansible.builtin.set_fact:
+    jf_wanted: "{{ jellyfin_users | map('lower') | list }}"
+    jf_existing: "{{ jf_users.json | map(attribute='Name') | map('lower') | list }}"
+
+- name: Jellyfin users
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Users/New
+    method: POST
+    headers: "{{ jf_headers }}"
+    body_format: json
+    body: { Name: "{{ item.key }}", Password: "{{ item.value }}" }
+  loop: "{{ jellyfin_users | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: item.key | lower not in jf_existing
+  changed_when: true
+  no_log: true
+
+- name: Jellyfin users removed
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Users/{{ item.Id }}
+    method: DELETE
+    headers: "{{ jf_headers }}"
+    status_code: 204
+  loop: "{{ jf_users.json | rejectattr('Policy.IsAdministrator') }}"
+  loop_control:
+    label: "{{ item.Name }}"
+  when:
+    - item.Name | lower not in jf_wanted
+    - item.Name | lower != jellyfin_admin | lower
+  changed_when: true
+
+- name: Jellyfin repositories present
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Repositories
+    headers: "{{ jf_headers }}"
+  register: jf_repos
+
+- name: Jellyfin repositories
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Repositories
+    method: POST
+    headers: "{{ jf_headers }}"
+    body_format: json
+    body: "{{ jf_repos.json + (jellyfin_repositories | rejectattr('Url', 'in', jf_repos.json | map(attribute='Url')) | map('combine', {'Enabled': true})) }}"
+    status_code: 204
+  when: jellyfin_repositories | map(attribute='Url') | difference(jf_repos.json | map(attribute='Url')) | length > 0
+  changed_when: true
+
+- name: Jellyfin plugins present
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Plugins
+    headers: "{{ jf_headers }}"
+  register: jf_plugins
+
+- name: Jellyfin plugins
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Packages/Installed/{{ item | urlencode }}
+    method: POST
+    headers: "{{ jf_headers }}"
+    status_code: 204
+    timeout: 120
+  loop: "{{ jellyfin_plugins }}"
+  when: item not in (jf_plugins.json | map(attribute='Name'))
+  register: jf_installed
+  changed_when: true
+
+- name: Restart Jellyfin for plugins
+  ansible.builtin.command: docker compose restart jellyfin
+  args:
+    chdir: "{{ media_dir }}"
+  when: jf_installed is changed
+
+- name: Jellyfin back up
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/System/Info/Public
+  register: jf_back
+  retries: 30
+  delay: 5
+  until: jf_back.status == 200
+  when: jf_installed is changed
+
+- name: Auto Collections config
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Plugins/06ebf4a9-1326-4327-968d-8da00e1ea2eb/Configuration
+    headers: "{{ jf_headers }}"
+  register: jf_collections
+
+- name: Auto Collections wanted
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/Plugins/06ebf4a9-1326-4327-968d-8da00e1ea2eb/Configuration
+    method: POST
+    headers: "{{ jf_headers }}"
+    body_format: json
+    body: "{{ jf_collections.json | combine(collections_wanted) }}"
+    status_code: 204
+  vars:
+    collections_wanted:
+      IsInitialized: true
+      DeleteOrphanedCollections: true
+      ExpressionCollections: []
+      TitleMatchPairs: >-
+        {% set out = [] %}{% for c in jellyfin_collections %}{% set _ = out.append({'TitleMatch': c.name,
+        'CollectionName': c.name, 'CaseSensitive': false, 'MatchType': c.by, 'MediaType': 'Movies',
+        'ExactMatch': true, 'SortBy': 'ReleaseYear', 'SortOrder': 'Ascending'}) %}{% endfor %}{{ out }}
+  when: jf_collections.json | combine(collections_wanted) != jf_collections.json
+  register: jf_collections_saved
+  changed_when: true
+
+- name: Auto Collections sync
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/AutoCollections/AutoCollections
+    method: POST
+    headers: "{{ jf_headers }}"
+    status_code: 202
+  when: jf_collections_saved is changed

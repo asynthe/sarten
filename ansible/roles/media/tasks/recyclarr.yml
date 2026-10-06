@@ -1,0 +1,91 @@
+- name: Recyclarr config
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../services/media/recyclarr.yml"
+    dest: "{{ media_dir }}/config/recyclarr/recyclarr.yml"
+    owner: "{{ media_uid }}"
+    group: "{{ media_uid }}"
+    mode: "0644"
+
+- name: Recyclarr secrets
+  ansible.builtin.copy:
+    dest: "{{ media_dir }}/config/recyclarr/secrets.yml"
+    owner: "{{ media_uid }}"
+    group: "{{ media_uid }}"
+    mode: "0600"
+    content: |
+      radarr_api_key: {{ arr_keys.radarr }}
+      sonarr_api_key: {{ arr_keys.sonarr }}
+  no_log: true
+
+- name: Recyclarr sync
+  ansible.builtin.command: docker compose exec -T recyclarr recyclarr sync
+  args:
+    chdir: "{{ media_dir }}"
+  register: recyclarr
+  changed_when: recyclarr.stdout is search('(Created|Updated) \d+ ')
+
+- name: Radarr formats current
+  ansible.builtin.uri:
+    url: http://127.0.0.1:7878/api/v3/customformat
+    headers: { X-Api-Key: "{{ arr_keys.radarr }}" }
+  register: radarr_formats_now
+
+- name: Radarr formats
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:7878/api/v3/customformat{{ '/' ~ current.id if current else '' }}"
+    method: "{{ 'PUT' if current else 'POST' }}"
+    headers: { X-Api-Key: "{{ arr_keys.radarr }}" }
+    body_format: json
+    body: "{{ (current or {}) | combine({'name': item.name, 'includeCustomFormatWhenRenaming': false, 'specifications': wanted}) }}"
+    status_code: [200, 201, 202]
+  vars:
+    current: "{{ radarr_formats_now.json | selectattr('name', 'eq', item.name) | first | default(none) }}"
+    wanted: >-
+      {% set out = [] %}{% for s in item.specifications %}{% set f = [] %}{% for k, v in s.fields.items() %}{%
+      set _ = f.append({'name': k, 'value': v}) %}{% endfor %}{% set _ = out.append({'name': s.name,
+      'implementation': s.implementation, 'negate': false, 'required': false, 'fields': f}) %}{% endfor %}{{ out }}
+    seen: >-
+      {% set out = [] %}{% for s in (current.specifications if current else []) %}{% set _ = out.append([s.name,
+      s.implementation, s.fields | items2dict(key_name='name', value_name='value') | dict2items
+      | map(attribute='value') | map('string') | map('regex_replace', '\.0$', '') | list]) %}{% endfor %}{{ out }}
+    want: >-
+      {% set out = [] %}{% for s in item.specifications %}{% set _ = out.append([s.name, s.implementation,
+      s.fields.values() | map('string') | list]) %}{% endfor %}{{ out }}
+  loop: "{{ radarr_formats }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: not current or seen != want
+  changed_when: true
+
+- name: Radarr formats saved
+  ansible.builtin.uri:
+    url: http://127.0.0.1:7878/api/v3/customformat
+    headers: { X-Api-Key: "{{ arr_keys.radarr }}" }
+  register: radarr_formats_now
+
+- name: Movie profile
+  ansible.builtin.uri:
+    url: http://127.0.0.1:7878/api/v3/qualityprofile
+    headers: { X-Api-Key: "{{ arr_keys.radarr }}" }
+  register: radarr_profiles
+
+- name: Movie profile scores
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:7878/api/v3/qualityprofile/{{ profile.id }}"
+    method: PUT
+    headers: { X-Api-Key: "{{ arr_keys.radarr }}" }
+    body_format: json
+    body: "{{ profile | combine({'formatItems': profile.formatItems | rejectattr('format', 'in', scores | map(attribute='format')) | list + scores}) }}"
+    status_code: [200, 202]
+  vars:
+    profile: "{{ radarr_profiles.json | selectattr('name', 'eq', movie_profile) | first }}"
+    scores: >-
+      {% set out = [] %}{% for f in radarr_formats %}{% set id = (radarr_formats_now.json | selectattr('name', 'eq', f.name)
+      | first).id %}{% set _ = out.append({'format': id, 'name': f.name, 'score': f.score}) %}{% endfor %}{{ out }}
+    have: >-
+      {% set out = [] %}{% for i in profile.formatItems if i.format in scores | map(attribute='format') | list %}{%
+      set _ = out.append([i.format, i.score]) %}{% endfor %}{{ out | sort }}
+    want: >-
+      {% set out = [] %}{% for i in scores %}{% set _ = out.append([i.format, i.score]) %}{% endfor %}{{ out | sort }}
+  when: have != want
+  changed_when: true

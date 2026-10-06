@@ -1,4 +1,6 @@
 timezone: America/Santiago
+lan_subnet: 192.168.1.0/24
+tailnet: tailb24b62.ts.net
 
 packages:
   - btop
@@ -20,6 +22,11 @@ admins:
 
 data_label: sarten-data
 data_mount: /srv
+media_root: "{{ data_mount }}/media"
+stacks_dir: /opt
+media_dir: "{{ stacks_dir }}/media"
+monitoring_dir: "{{ stacks_dir }}/monitoring"
+wazuh_dir: "{{ stacks_dir }}/wazuh"
 data_subvolumes:
   - media
   - archive
@@ -27,10 +34,11 @@ media_dirs:
   - downloads
   - movies
   - series
-  - anime
+  - series-es
   - music
 
-media_owner: 101000
+media_uid: 1000
+media_owner: "{{ 100000 + media_uid }}"
 
 ct_template: debian-13-standard
 ct_storage: local-btrfs
@@ -55,3 +63,4 @@ tailscale_serve:
   - { port: 3001, guest: monitoring, to: 3000 }
   - { port: 9090, guest: monitoring }
   - { port: 5601, guest: wazuh, to: 443, scheme: https+insecure }
+  - { port: 443, guest: media, to: 8096, funnel: true }

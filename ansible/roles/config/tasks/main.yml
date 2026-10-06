@@ -6,7 +6,7 @@
   loop: "{{ config_files | map(attribute='dest') | map('dirname') | unique }}"
 
 - name: Config files
-  ansible.builtin.copy:
+  ansible.builtin.template:
     src: "{{ playbook_dir }}/../config/{{ item.src }}"
     dest: "{{ item.dest }}"
     owner: root

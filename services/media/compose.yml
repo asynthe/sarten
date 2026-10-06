@@ -1,24 +1,22 @@
 x-arr: &arr
   restart: unless-stopped
   environment:
-    PUID: "1000"
-    PGID: "1000"
-    TZ: America/Santiago
-  volumes:
-    - /srv/media:/data
+    PUID: ${PUID}
+    PGID: ${PGID}
+    TZ: ${TZ}
 
 services:
   jellyfin:
     image: jellyfin/jellyfin:latest
     restart: unless-stopped
-    user: "1000:1000"
+    user: ${PUID}:${PGID}
     ports: ["8096:8096"]
     environment:
-      TZ: America/Santiago
+      TZ: ${TZ}
     volumes:
       - ./config/jellyfin:/config
       - ./cache/jellyfin:/cache
-      - /srv/media:/data
+      - ${MEDIA_ROOT}:/data
 
   sonarr:
     <<: *arr
@@ -26,7 +24,7 @@ services:
     ports: ["8989:8989"]
     volumes:
       - ./config/sonarr:/config
-      - /srv/media:/data
+      - ${MEDIA_ROOT}:/data
 
   radarr:
     <<: *arr
@@ -34,7 +32,7 @@ services:
     ports: ["7878:7878"]
     volumes:
       - ./config/radarr:/config
-      - /srv/media:/data
+      - ${MEDIA_ROOT}:/data
 
   lidarr:
     <<: *arr
@@ -42,7 +40,7 @@ services:
     ports: ["8686:8686"]
     volumes:
       - ./config/lidarr:/config
-      - /srv/media:/data
+      - ${MEDIA_ROOT}:/data
 
   prowlarr:
     <<: *arr
@@ -57,7 +55,7 @@ services:
     ports: ["6767:6767"]
     volumes:
       - ./config/bazarr:/config
-      - /srv/media:/data
+      - ${MEDIA_ROOT}:/data
 
   gluetun:
     image: qmcgaw/gluetun:latest
@@ -67,38 +65,50 @@ services:
     ports: ["8080:8080"]
     env_file: vpn.env
     environment:
-      TZ: America/Santiago
+      TZ: ${TZ}
+      FIREWALL_OUTBOUND_SUBNETS: ${LAN_SUBNET}
 
   qbittorrent:
-    <<: *arr
     image: lscr.io/linuxserver/qbittorrent:latest
+    restart: unless-stopped
     network_mode: service:gluetun
     depends_on:
       gluetun:
         condition: service_healthy
+        restart: true
     environment:
-      PUID: "1000"
-      PGID: "1000"
-      TZ: America/Santiago
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
       WEBUI_PORT: "8080"
       TORRENTING_PORT: "6881"
     volumes:
       - ./config/qbittorrent:/config
-      - /srv/media:/data
+      - ${MEDIA_ROOT}:/data
+
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:8
+    restart: unless-stopped
+    user: ${PUID}:${PGID}
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ./config/recyclarr:/config
 
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
     restart: unless-stopped
+    shm_size: 1gb
     environment:
-      TZ: America/Santiago
+      TZ: ${TZ}
 
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     restart: unless-stopped
     ports: ["3000:3000"]
     environment:
-      HOMEPAGE_ALLOWED_HOSTS: 192.168.1.140:3000,media:3000,media.lan:3000,sarten:3000
+      HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS}
     volumes:
       - ./homepage:/app/config
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /srv/media:/data:ro
+      - ${MEDIA_ROOT}:/data:ro

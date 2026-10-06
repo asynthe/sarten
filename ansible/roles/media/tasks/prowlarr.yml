@@ -74,6 +74,7 @@
   ansible.builtin.uri:
     url: http://127.0.0.1:9696/api/v1/indexer?forceSave=true
     method: POST
+    timeout: 120
     headers: { X-Api-Key: "{{ arr_keys.prowlarr }}" }
     body_format: json
     body:
