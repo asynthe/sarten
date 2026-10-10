@@ -1,0 +1,57 @@
+- name: Wazuh key
+  ansible.builtin.get_url:
+    url: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+    dest: /etc/apt/keyrings/wazuh.asc
+    mode: "0644"
+
+- name: Wazuh repo
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/wazuh.sources
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: https://packages.wazuh.com/4.x/apt/
+      Suites: stable
+      Components: main
+      Signed-By: /etc/apt/keyrings/wazuh.asc
+
+- name: Wazuh agent
+  ansible.builtin.apt:
+    name: "wazuh-agent={{ wazuh_version }}-1"
+    update_cache: true
+    allow_downgrade: true
+
+- name: Hold agent at the manager's version
+  ansible.builtin.dpkg_selections:
+    name: wazuh-agent
+    selection: hold
+
+- name: Manager address
+  ansible.builtin.replace:
+    path: /var/ossec/etc/ossec.conf
+    regexp: "<address>.*</address>"
+    replace: "<address>{{ hostvars['wazuh'].ansible_host }}</address>"
+  notify: Restart wazuh-agent
+
+- name: Log sources
+  ansible.builtin.blockinfile:
+    path: /var/ossec/etc/ossec.conf
+    marker: "<!-- {mark} sarten -->"
+    block: |
+      <ossec_config>
+        <localfile>
+          <log_format>syslog</log_format>
+          <location>/var/log/auth.log</location>
+        </localfile>
+        <localfile>
+          <log_format>apache</log_format>
+          <location>/var/log/pveproxy/access.log</location>
+        </localfile>
+      </ossec_config>
+  notify: Restart wazuh-agent
+
+- name: wazuh-agent
+  ansible.builtin.systemd:
+    name: wazuh-agent
+    enabled: true
+    state: started

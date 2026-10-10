@@ -1,110 +1,68 @@
-# sarten
-
-Infrastructure for a single-node Proxmox VE homelab. OpenTofu decides which
-guests exist, Ansible configures the host and everything inside the guests, and
-each guest runs one docker compose stack. Each layer only does its own job.
-
-| folder | what |
-| --- | --- |
-| `install/` | unattended installer answer file and ISO builder |
-| `tofu/` | guests: size, network, mounts |
-| `ansible/` | host and guest configuration, one role per concern |
-| `config/` | plain files pushed to the host, one folder per app; destinations in `ansible/group_vars/all.yml` |
-| `services/` | one compose stack per guest |
-
-| ansible role | does |
-| --- | --- |
-| `base` | repositories, packages, timezone, container template |
-| `users` | admin accounts, ssh keys, Proxmox permissions |
-| `storage` | mounts the data mirror, subvolumes, media layout |
-| `tailscale` | tailnet access, subnet routing, and `tailscale serve` exposing guest ports as `sarten:<port>` (`tailscale_serve` in group_vars); entries with `funnel: true` are public at `https://sarten.<tailnet>.ts.net` instead |
-| `config` | copies `config/` onto the host |
-| `lxc` | container feature flags and bind mounts, from the host |
-| `exporters` | node exporter, SMART metrics and smartd on the host |
-| `docker` | docker inside a guest |
-| `media`, `monitoring`, `wazuh` | each guest's compose stack |
-
-| guest | runs |
-| --- | --- |
-| `media` | jellyfin, the arr apps, qbittorrent behind gluetun, flaresolverr, recyclarr, homepage |
-| `monitoring` | prometheus, grafana, the Proxmox exporter |
-| `wazuh` | single-node Wazuh manager, indexer and dashboard; takes syslog |
-
-The `media` role also wires the apps together through their APIs: qBittorrent
-saves to `/data/downloads/<category>` on the same subvolume as the library, so
-imports are hardlinks; each arr gets its root folders and qBittorrent as
-download client; Prowlarr syncs its indexers to them, sending Cloudflare sites
-through FlareSolverr; Recyclarr keeps Radarr on the TRaSH `HD Bluray + WEB`
-profile, with `radarr_formats` on top: only YTS releases pass its minimum score,
-nothing over `movie_max_gb`, and other files are upgraded to YTS; Sonarr is on
-`WEB-1080p`, naming folders `Title (Year) [tmdbid-N]` and `[tvdbid-N]` for
-Jellyfin; Bazarr reads Sonarr and Radarr and fetches `subtitle_languages` for
-everything; Jellyfin gets a library per media folder, the plugins in `jellyfin_plugins`,
-the collections in `jellyfin_collections` and the accounts in `jellyfin_users`.
-`series-es` holds Latin American Spanish dubs, uploaded by hand: no arr app
-knows the folder, so nothing renames or replaces them, and its Jellyfin library
-fetches `es-MX` metadata. Files holding two TMDB segments are named
-`S01E01-E02`.
-Settings spelled out in `site.yml` are enforced; everything else only adds what
-is missing, so changes made in the UIs stay, except that non-admin Jellyfin
-accounts not in `jellyfin_users` are deleted. Logins are `media_user`
-(`jellyfin_admin` on Jellyfin) with `media_password`, skipped from local
-addresses on the arr apps and qBittorrent. qBittorrent's traffic leaves only
-through the VPN in `vpn`, a map of gluetun environment variables.
-
-`services/wazuh/` is upstream's single-node stack, trimmed to fit an
-unprivileged container: no memlock, a lower file limit, and only the dashboard,
-agent and syslog ports published.
-
-## Deploy
-
-```bash
-cd ansible && ansible-galaxy collection install -r requirements.yml -p .collections
-ansible-playbook site.yml -l sarten -e upgrade=true
-
-cd ../tofu
-tofu init && tofu apply
-
-cd ../ansible && ansible-playbook site.yml -l guests
+```
+        .-~~~~~~~-.
+      .'           '.
+     /     .---.     \
+    |     ( (@) )     |==========[]
+     \     '---'     /
+      '.           .'
+        '-._____.-'
 ```
 
-Secrets live in `ansible/group_vars/all.sops.yaml`, encrypted with sops to the
-age key in `.sops.yaml`; change them with `sops edit`.
+# sarten
 
-| key | used by |
-| --- | --- |
-| `proxmox_api_token` | tofu |
-| `ssh_keys` | `users`, tofu |
-| `vpn` | gluetun, a map of its environment variables |
-| `media_password` | logins for `media_user` on qBittorrent and the arr apps, and `jellyfin_admin` on Jellyfin |
-| `jellyfin_users` | other Jellyfin accounts, `name: password`; the password is only the first one, and a non-admin account missing from the list is deleted |
-| `subtitles` | optional Bazarr provider logins, `provider: {key: value}` as in Bazarr's settings, e.g. `opensubtitlescom: {username, password}` |
+A home SOC lab: a Proxmox server monitored by a self-hosted Wazuh SIEM, built
+and configured entirely as code. One service, Jellyfin, faces the internet on
+purpose, so the lab watches real-world traffic as well as its own.
 
-Paths, the LAN subnet, the tailnet name and the media uid are set once in
-`ansible/group_vars/all.yml`; the media stack reads them from a generated `.env`,
-and files in `config/` are rendered as templates.
+```
+            internet
+               │ Tailscale Funnel (HTTPS)
+               ▼
+┌──────────── sarten · Proxmox VE · Debian 13 ─────────────┐
+│ wazuh-agent · rsyslog · node exporter · smartd           │
+│                                                          │
+│ ┌─ media ──────┐  ┌─ monitoring ─┐  ┌─ wazuh ──────────┐ │
+│ │ Jellyfin     │  │ Prometheus   │  │ manager          │ │
+│ │ arr apps     │  │ Grafana      │  │ indexer          │ │
+│ │ qBittorrent  │  │ PVE exporter │  │ dashboard        │ │
+│ │  behind VPN  │  │              │  │ syslog 514/udp   │ │
+│ └──────────────┘  └──────────────┘  └────────▲─────────┘ │
+└──────────────────────────────────────────────┼───────────┘
+                                               │ agents, 1514/tcp
+                                   sarten (Debian 13)
+                                   p1 (Windows 11)
+```
 
-Ansible loads the sops file through the `community.sops` vars plugin and Tofu
-through the `carlpett/sops` provider, so both read the same file with no wrapper.
+## Detections
 
-Tofu authenticates with the Proxmox API token stored there. Tokens cannot set
-LXC feature flags or bind mounts, so the `lxc` role applies those from the
-inventory and Tofu ignores them. Every step is idempotent; re-run the one whose
-folder changed. `-t config` pushes only `config/`.
+| what | how | status |
+| --- | --- | --- |
+| SSH logins, sudo to root, PAM sessions | agent reads `auth.log` on the host | working |
+| CIS benchmark: Debian 13, Windows 11 | Wazuh SCA on each agent | working |
+| Proxmox web UI access | agent reads the `pveproxy` access log | collecting |
+| file integrity, vulnerable packages | Wazuh FIM and vulnerability detection, defaults | collecting |
+| Jellyfin brute force over Funnel | Jellyfin log, custom decoder and rules | planned |
+| SSH brute force, blocked automatically | hydra from Kali, active response | planned |
+| SQL injection, XSS, web shells | DVWA target, web logs, FIM and YARA | planned |
+| network scans | Suricata on the lab bridge | planned |
 
-## Once per install
+The planned rows run in an isolated lab: a deliberately weak target and a Kali
+VM on a bridge with no route to the home network.
 
-| step | how |
-| --- | --- |
-| root ssh key | `ssh-copy-id root@<host>` |
-| data mirror | `mkfs.btrfs -L sarten-data -d raid1 -m raid1 <disk> <disk>` |
-| tailnet | `tailscale up --advertise-routes=<lan>`, then approve the route |
-| funnel | in the admin console, enable HTTPS certificates and give the host the `funnel` node attribute |
-| web UI login for admins | `passwd <user>` |
+## Findings
 
-## Recovery
+**Default credentials.** The Wazuh stack first ran on upstream's demo
+passwords, committed in this public repo. They were rotated into sops, loaded
+into the indexer with `securityadmin.sh`, and the old `admin` password was
+verified to be rejected. They remain in git history, inert.
 
-Both `/` and the data mirror are btrfs RAID1, which refuses to mount with a
-disk missing. For `/`, add `rootflags=degraded` to the kernel line at boot, then
-`btrfs replace` the dead disk. The data mirror is `nofail` and never blocks
-boot; mount it with `-o degraded` and replace the same way.
+## Stack
+
+Proxmox VE · OpenTofu · Ansible · Docker · Wazuh 4.14 · Prometheus · Grafana ·
+Tailscale · sops + age
+
+OpenTofu creates the guests, Ansible configures the host and everything inside
+them, and each guest runs one compose stack. Nothing decrypted is committed.
+Technical reference: [docs/DOCS.md](docs/DOCS.md).
+
+*asynthe, 2026.*

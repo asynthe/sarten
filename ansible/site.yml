@@ -7,6 +7,7 @@
     - { role: config, tags: config }
     - { role: tailscale, tags: tailscale }
     - { role: exporters, tags: exporters }
+    - { role: wazuh_agent, tags: wazuh_agent }
 
 - name: Guests, bootstrap
   hosts: guests
@@ -81,6 +82,7 @@
       - { name: Movies, type: movies, paths: [/data/movies] }
       - { name: Shows, type: tvshows, paths: [/data/series] }
       - { name: Series Latino, type: tvshows, paths: [/data/series-es], language: es-MX, country: MX }
+      - { name: Videos, type: tvshows, paths: [/data/videos], language: es-MX, country: MX }
     jellyfin_repositories:
       - { Name: IAmParadox27, Url: "https://www.iamparadox.dev/jellyfin/plugins/manifest.json" }
       - { Name: Intro Skipper, Url: "https://intro-skipper.org/manifest.json" }

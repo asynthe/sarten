@@ -12,6 +12,7 @@ packages:
   - lm-sensors
   - neovim
   - rsync
+  - rsyslog
   - smartmontools
   - tmux
   - zsh
@@ -27,6 +28,7 @@ stacks_dir: /opt
 media_dir: "{{ stacks_dir }}/media"
 monitoring_dir: "{{ stacks_dir }}/monitoring"
 wazuh_dir: "{{ stacks_dir }}/wazuh"
+wazuh_version: 4.14.8
 data_subvolumes:
   - media
   - archive
@@ -35,6 +37,7 @@ media_dirs:
   - movies
   - series
   - series-es
+  - videos
   - music
 
 media_uid: 1000
