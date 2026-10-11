@@ -1,0 +1,9 @@
+<decoder name="jellyfin">
+  <prematch type="pcre2">^\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ [+-]\d\d:\d\d\] \[\w+\] \[\d+\] </prematch>
+</decoder>
+
+<decoder name="jellyfin-auth">
+  <parent>jellyfin</parent>
+  <regex type="pcre2">Authentication request for "([^"]*)" has (succeeded|been denied)(?: \(IP: "([^"]+)"\))?</regex>
+  <order>dstuser, status, srcip</order>
+</decoder>

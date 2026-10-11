@@ -39,14 +39,12 @@
     marker: "<!-- {mark} sarten -->"
     block: |
       <ossec_config>
+      {% for log in wazuh_logs | default([]) %}
         <localfile>
-          <log_format>syslog</log_format>
-          <location>/var/log/auth.log</location>
+          <log_format>{{ log.format }}</log_format>
+          <location>{{ log.location }}</location>
         </localfile>
-        <localfile>
-          <log_format>apache</log_format>
-          <location>/var/log/pveproxy/access.log</location>
-        </localfile>
+      {% endfor %}
       </ossec_config>
   notify: Restart wazuh-agent
 

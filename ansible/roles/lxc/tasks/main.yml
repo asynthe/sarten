@@ -41,3 +41,7 @@
     delay: 5
     timeout: 120
   when: features is changed or mounts is changed or devices is changed
+
+- name: Timezone
+  community.general.timezone:
+    name: "{{ timezone }}"

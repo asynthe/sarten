@@ -62,4 +62,25 @@ containers = {
       | Syslog | 514/udp |
     EOT
   }
+
+  honeypot = {
+    id       = 140
+    ip       = "192.168.1.143/24"
+    template = "local-btrfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
+    cores    = 1
+    memory   = 1024
+    disk     = 8
+    tags     = ["docker", "security"]
+    notes    = <<-EOT
+      # honeypot
+      docker compose · source: `services/honeypot` in the sarten repo
+
+      Decoy web page, public on Tailscale Funnel at :8443. Every request is
+      logged with the visitor's IP and sent to Wazuh.
+
+      | service | |
+      | --- | --- |
+      | Decoy | http://192.168.1.143 |
+    EOT
+  }
 }

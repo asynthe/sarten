@@ -97,6 +97,7 @@
     - { role: lxc, tags: [media, lxc] }
     - { role: docker, tags: [media, docker] }
     - { role: media, tags: media }
+    - { role: wazuh_agent, tags: [media, wazuh_agent] }
 
 - name: monitoring
   hosts: monitoring
@@ -113,3 +114,11 @@
     - { role: lxc, tags: [wazuh, lxc] }
     - { role: docker, tags: [wazuh, docker] }
     - { role: wazuh, tags: wazuh }
+
+- name: honeypot
+  hosts: honeypot
+  roles:
+    - { role: lxc, tags: [honeypot, lxc] }
+    - { role: docker, tags: [honeypot, docker] }
+    - { role: honeypot, tags: honeypot }
+    - { role: wazuh_agent, tags: [honeypot, wazuh_agent] }

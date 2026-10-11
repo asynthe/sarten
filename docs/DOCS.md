@@ -19,17 +19,18 @@ each guest runs one docker compose stack. Each layer only does its own job.
 | `storage` | mounts the data mirror, subvolumes, media layout |
 | `tailscale` | tailnet access, subnet routing, and `tailscale serve` exposing guest ports as `sarten:<port>` (`tailscale_serve` in group_vars); entries with `funnel: true` are public at `https://sarten.<tailnet>.ts.net` instead |
 | `config` | copies `config/` onto the host |
-| `lxc` | container feature flags and bind mounts, from the host |
+| `lxc` | container feature flags and bind mounts, from the host; the host's timezone inside |
 | `exporters` | node exporter, SMART metrics and smartd on the host |
-| `wazuh_agent` | Wazuh agent on the host, held at `wazuh_version`, reading auth and Proxmox web UI logs |
+| `wazuh_agent` | Wazuh agent on the host, `media` and `honeypot`, held at `wazuh_version`, reading each host's `wazuh_logs` from the inventory |
 | `docker` | docker inside a guest |
-| `media`, `monitoring`, `wazuh` | each guest's compose stack |
+| `media`, `monitoring`, `wazuh`, `honeypot` | each guest's compose stack |
 
 | guest | runs |
 | --- | --- |
 | `media` | jellyfin, the arr apps, qbittorrent behind gluetun, flaresolverr, recyclarr, homepage |
 | `monitoring` | prometheus, grafana, the Proxmox exporter |
 | `wazuh` | single-node Wazuh manager, indexer and dashboard; takes syslog |
+| `honeypot` | nginx serving a decoy login page, public through Funnel on 8443 |
 
 The `media` role also wires the apps together through their APIs: qBittorrent
 saves to `/data/downloads/<category>` on the same subvolume as the library, so
@@ -52,7 +53,14 @@ is missing, so changes made in the UIs stay, except that non-admin Jellyfin
 accounts not in `jellyfin_users` are deleted. Logins are `media_user`
 (`jellyfin_admin` on Jellyfin) with `media_password`, skipped from local
 addresses on the arr apps and qBittorrent. qBittorrent's traffic leaves only
-through the VPN in `vpn`, a map of gluetun environment variables.
+through the VPN in `vpn`, a map of gluetun environment variables. Jellyfin
+trusts `X-Forwarded-For` from the host, so logins through Funnel are logged
+with the client's real IP.
+
+`services/honeypot/` runs nginx read-only, with every capability dropped,
+taking the client IP from the host's `X-Forwarded-For` and logging in the
+combined format, which Wazuh's web rules decode. Logs rotate daily and keep 30
+days.
 
 Grafana opens on `services/monitoring/dashboards/sarten.json`, an overview of
 the host, guests, disks and temperatures; the `grafana_dashboards` IDs from
@@ -61,7 +69,8 @@ and serial, never `sdX`.
 
 `services/wazuh/` is upstream's single-node stack, trimmed to fit an
 unprivileged container: no memlock, a lower file limit, and only the dashboard,
-agent and syslog ports published. Its passwords live in `wazuh` in
+agent and syslog ports published. Custom decoders and rules are in
+`config/ruleset/`, mounted into the manager. Its passwords live in `wazuh` in
 `all.sops.yaml`: `admin_password` logs into the dashboard, `dashboard_password`
 is the dashboard's own indexer user, `api_password` is the manager API's
 `wazuh-wui`, and the two `_hash` entries are bcrypt hashes of the first two
@@ -100,8 +109,8 @@ Ansible loads the sops file through the `community.sops` vars plugin and Tofu
 through the `carlpett/sops` provider, so both read the same file with no wrapper.
 
 Tofu authenticates with the Proxmox API token stored there. Tokens cannot set
-LXC feature flags or bind mounts, so the `lxc` role applies those from the
-inventory and Tofu ignores them. Every step is idempotent; re-run the one whose
+LXC feature flags, bind mounts or device passthrough, so the `lxc` role applies
+those from the inventory and Tofu ignores them. Every step is idempotent; re-run the one whose
 folder changed. `-t config` pushes only `config/`.
 
 ## Once per install

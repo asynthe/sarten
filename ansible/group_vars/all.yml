@@ -29,6 +29,7 @@ media_dir: "{{ stacks_dir }}/media"
 monitoring_dir: "{{ stacks_dir }}/monitoring"
 wazuh_dir: "{{ stacks_dir }}/wazuh"
 wazuh_version: 4.14.8
+honeypot_dir: "{{ stacks_dir }}/honeypot"
 data_subvolumes:
   - media
   - archive
@@ -67,3 +68,4 @@ tailscale_serve:
   - { port: 9090, guest: monitoring }
   - { port: 5601, guest: wazuh, to: 443, scheme: https+insecure }
   - { port: 443, guest: media, to: 8096, funnel: true }
+  - { port: 8443, guest: honeypot, to: 80, funnel: true }

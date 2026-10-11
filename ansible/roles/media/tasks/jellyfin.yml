@@ -61,6 +61,27 @@
       Authorization: MediaBrowser Client="sarten", Device="ansible", DeviceId="ansible", Version="1", Token="{{ jf_auth.json.AccessToken }}"
   no_log: true
 
+- name: Jellyfin network config
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/System/Configuration/network
+    headers: "{{ jf_headers }}"
+  register: jf_network
+
+- name: Jellyfin trusts the host's forwarded IPs
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8096/System/Configuration/network
+    method: POST
+    headers: "{{ jf_headers }}"
+    body_format: json
+    body: "{{ jf_network.json | combine(network_wanted) }}"
+    status_code: 204
+  vars:
+    network_wanted:
+      KnownProxies: ["{{ hostvars[groups.proxmox | first].ansible_host }}"]
+  when: jf_network.json | combine(network_wanted) != jf_network.json
+  register: jf_network_saved
+  changed_when: true
+
 - name: Jellyfin libraries present
   ansible.builtin.uri:
     url: http://127.0.0.1:8096/Library/VirtualFolders
@@ -169,11 +190,11 @@
   register: jf_installed
   changed_when: true
 
-- name: Restart Jellyfin for plugins
+- name: Restart Jellyfin for plugins and network
   ansible.builtin.command: docker compose restart jellyfin
   args:
     chdir: "{{ media_dir }}"
-  when: jf_installed is changed
+  when: jf_installed is changed or jf_network_saved is changed
 
 - name: Jellyfin back up
   ansible.builtin.uri:
@@ -182,7 +203,7 @@
   retries: 30
   delay: 5
   until: jf_back.status == 200
-  when: jf_installed is changed
+  when: jf_installed is changed or jf_network_saved is changed
 
 - name: Auto Collections config
   ansible.builtin.uri:

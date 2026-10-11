@@ -4,6 +4,9 @@ all:
       hosts:
         sarten:
           ansible_host: 192.168.1.135
+          wazuh_logs:
+            - { format: syslog, location: /var/log/auth.log }
+            - { format: apache, location: /var/log/pveproxy/access.log }
     guests:
       hosts:
         media:
@@ -14,6 +17,8 @@ all:
             - { key: mp0, host: "{{ media_root }}", path: "{{ media_root }}" }
           ct_devices:
             - { key: dev0, path: /dev/net/tun }
+          wazuh_logs:
+            - { format: syslog, location: "{{ media_dir }}/config/jellyfin/log/log_%Y%m%d.log" }
         monitoring:
           ansible_host: 192.168.1.141
           ct_id: 120
@@ -22,5 +27,11 @@ all:
           ansible_host: 192.168.1.142
           ct_id: 130
           ct_features: keyctl=1,nesting=1
+        honeypot:
+          ansible_host: 192.168.1.143
+          ct_id: 140
+          ct_features: keyctl=1,nesting=1
+          wazuh_logs:
+            - { format: apache, location: "{{ honeypot_dir }}/logs/access.log" }
   vars:
     ansible_user: root
