@@ -54,6 +54,11 @@ accounts not in `jellyfin_users` are deleted. Logins are `media_user`
 addresses on the arr apps and qBittorrent. qBittorrent's traffic leaves only
 through the VPN in `vpn`, a map of gluetun environment variables.
 
+Grafana opens on `services/monitoring/dashboards/sarten.json`, an overview of
+the host, guests, disks and temperatures; the `grafana_dashboards` IDs from
+grafana.com sit beside it in the `sarten` folder. Disks are labelled by model
+and serial, never `sdX`.
+
 `services/wazuh/` is upstream's single-node stack, trimmed to fit an
 unprivileged container: no memlock, a lower file limit, and only the dashboard,
 agent and syslog ports published. Its passwords live in `wazuh` in

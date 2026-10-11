@@ -14,7 +14,7 @@
     src: "{{ playbook_dir }}/../services/monitoring/{{ item }}"
     dest: "{{ monitoring_dir }}/{{ item }}"
     mode: "0644"
-  loop: [compose.yml, prometheus.yml, grafana/]
+  loop: [compose.yml, prometheus.yml, grafana/, dashboards/sarten.json]
   register: files
 
 - name: Dashboards

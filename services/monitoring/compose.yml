@@ -24,6 +24,7 @@ services:
     environment:
       TZ: America/Santiago
       GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/sarten.json
     volumes:
       - ./grafana:/etc/grafana/provisioning:ro
       - ./dashboards:/var/lib/grafana/dashboards:ro
