@@ -5,7 +5,7 @@
     "sarten"
   ],
   "timezone": "browser",
-  "refresh": "30s",
+  "refresh": "1m",
   "schemaVersion": 39,
   "time": {
     "from": "now-24h",
@@ -22,11 +22,12 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 3,
-        "h": 4
+        "w": 4,
+        "h": 3
       },
       "targets": [
         {
@@ -40,12 +41,12 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
-          "decimals": 1,
+          "decimals": 0,
           "color": {
             "mode": "fixed",
             "fixedColor": "text"
-          }
+          },
+          "unit": "s"
         },
         "overrides": []
       },
@@ -53,6 +54,7 @@
         "colorMode": "value",
         "graphMode": "none",
         "textMode": "value",
+        "justifyMode": "center",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -62,17 +64,18 @@
     },
     {
       "id": 2,
-      "type": "gauge",
+      "type": "stat",
       "title": "CPU",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
-        "x": 3,
+        "x": 4,
         "y": 0,
-        "w": 3,
-        "h": 4
+        "w": 4,
+        "h": 3
       },
       "targets": [
         {
@@ -86,12 +89,11 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
               },
               {
@@ -107,33 +109,37 @@
           "color": {
             "mode": "thresholds"
           },
-          "min": 0,
-          "max": 1
+          "decimals": 0,
+          "unit": "percentunit"
         },
         "overrides": []
       },
       "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ]
-        },
-        "showThresholdMarkers": false
+        }
       }
     },
     {
       "id": 3,
-      "type": "gauge",
+      "type": "stat",
       "title": "Memory",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
-        "x": 6,
+        "x": 8,
         "y": 0,
-        "w": 3,
-        "h": 4
+        "w": 4,
+        "h": 3
       },
       "targets": [
         {
@@ -147,17 +153,16 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
               },
               {
                 "color": "orange",
-                "value": 0.7
+                "value": 0.8
               },
               {
                 "color": "red",
@@ -168,33 +173,37 @@
           "color": {
             "mode": "thresholds"
           },
-          "min": 0,
-          "max": 1
+          "decimals": 0,
+          "unit": "percentunit"
         },
         "overrides": []
       },
       "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ]
-        },
-        "showThresholdMarkers": false
+        }
       }
     },
     {
       "id": 4,
       "type": "stat",
-      "title": "Load (1m)",
+      "title": "Root",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
-        "x": 9,
+        "x": 12,
         "y": 0,
-        "w": 3,
-        "h": 4
+        "w": 4,
+        "h": 3
       },
       "targets": [
         {
@@ -203,40 +212,41 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "node_load1{instance=\"sarten\"}"
+          "expr": "1 - node_filesystem_avail_bytes{instance=\"sarten\",mountpoint=\"/\"} / node_filesystem_size_bytes{instance=\"sarten\",mountpoint=\"/\"}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
               },
               {
                 "color": "orange",
-                "value": 6
+                "value": 0.8
               },
               {
                 "color": "red",
-                "value": 8
+                "value": 0.9
               }
             ]
           },
           "color": {
             "mode": "thresholds"
           },
-          "decimals": 2
+          "decimals": 0,
+          "unit": "percentunit"
         },
         "overrides": []
       },
       "options": {
-        "colorMode": "background_solid",
-        "graphMode": "area",
+        "colorMode": "value",
+        "graphMode": "none",
         "textMode": "value",
+        "justifyMode": "center",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -247,16 +257,17 @@
     {
       "id": 5,
       "type": "stat",
-      "title": "Guests up",
+      "title": "Data",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
-        "x": 12,
+        "x": 16,
         "y": 0,
-        "w": 3,
-        "h": 4
+        "w": 4,
+        "h": 3
       },
       "targets": [
         {
@@ -265,23 +276,41 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum(pve_up{id=~\"lxc/.*|qemu/.*\"})"
+          "expr": "1 - node_filesystem_avail_bytes{instance=\"sarten\",mountpoint=\"/srv\"} / node_filesystem_size_bytes{instance=\"sarten\",mountpoint=\"/srv\"}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
           "color": {
-            "mode": "fixed",
-            "fixedColor": "blue"
-          }
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "unit": "percentunit"
         },
         "overrides": []
       },
       "options": {
-        "colorMode": "background_solid",
+        "colorMode": "value",
         "graphMode": "none",
         "textMode": "value",
+        "justifyMode": "center",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -292,16 +321,17 @@
     {
       "id": 6,
       "type": "stat",
-      "title": "Hottest CPU",
+      "title": "Disks",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
-        "x": 15,
+        "x": 20,
         "y": 0,
-        "w": 3,
-        "h": 4
+        "w": 4,
+        "h": 3
       },
       "targets": [
         {
@@ -310,73 +340,11 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "max(node_hwmon_temp_celsius{instance=\"sarten\",chip=~\"platform_coretemp_.*\"})"
+          "expr": "min(smartmon_device_smart_healthy) * (sum(node_btrfs_device_errors_total or vector(0)) == bool 0)"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "celsius",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 85
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "background_solid",
-        "graphMode": "area",
-        "textMode": "value",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      }
-    },
-    {
-      "id": 7,
-      "type": "stat",
-      "title": "SMART",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 18,
-        "y": 0,
-        "w": 3,
-        "h": 4
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "A",
-          "expr": "min(smartmon_device_smart_healthy)"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -385,7 +353,7 @@
                 "value": null
               },
               {
-                "color": "green",
+                "color": "text",
                 "value": 1
               }
             ]
@@ -398,21 +366,23 @@
               "type": "value",
               "options": {
                 "0": {
-                  "text": "FAILING"
+                  "text": "check"
                 },
                 "1": {
-                  "text": "HEALTHY"
+                  "text": "ok"
                 }
               }
             }
-          ]
+          ],
+          "unit": "none"
         },
         "overrides": []
       },
       "options": {
-        "colorMode": "background_solid",
+        "colorMode": "value",
         "graphMode": "none",
         "textMode": "value",
+        "justifyMode": "center",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -421,86 +391,17 @@
       }
     },
     {
-      "id": 8,
-      "type": "stat",
-      "title": "Btrfs errors",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 21,
-        "y": 0,
-        "w": 3,
-        "h": 4
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "A",
-          "expr": "sum(node_btrfs_device_errors_total) or vector(0)"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "background_solid",
-        "graphMode": "none",
-        "textMode": "value",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      }
-    },
-    {
-      "id": 9,
-      "type": "row",
-      "title": "Guests",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 4,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 10,
+      "id": 7,
       "type": "timeseries",
-      "title": "CPU per guest",
+      "title": "CPU",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
         "x": 0,
-        "y": 5,
+        "y": 3,
         "w": 12,
         "h": 8
       },
@@ -517,32 +418,28 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 25,
-            "gradientMode": "opacity",
+            "lineWidth": 1,
+            "fillOpacity": 0,
             "showPoints": "never",
             "lineInterpolation": "smooth",
-            "stacking": {
-              "mode": "normal"
-            }
+            "axisBorderShow": false,
+            "axisPlacement": "auto"
           },
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "min": 0,
+          "unit": "percentunit"
         },
         "overrides": []
       },
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
           "mode": "multi",
@@ -551,16 +448,17 @@
       }
     },
     {
-      "id": 11,
+      "id": 8,
       "type": "timeseries",
-      "title": "Memory per guest",
+      "title": "Memory",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
         "x": 12,
-        "y": 5,
+        "y": 3,
         "w": 12,
         "h": 8
       },
@@ -577,32 +475,28 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 25,
-            "gradientMode": "opacity",
+            "lineWidth": 1,
+            "fillOpacity": 0,
             "showPoints": "never",
             "lineInterpolation": "smooth",
-            "stacking": {
-              "mode": "normal"
-            }
+            "axisBorderShow": false,
+            "axisPlacement": "auto"
           },
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "min": 0,
+          "unit": "bytes"
         },
         "overrides": []
       },
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
           "mode": "multi",
@@ -611,16 +505,17 @@
       }
     },
     {
-      "id": 12,
+      "id": 9,
       "type": "timeseries",
-      "title": "Network per guest",
+      "title": "Temperature",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
         "x": 0,
-        "y": 13,
+        "y": 11,
         "w": 12,
         "h": 8
       },
@@ -631,8 +526,8 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "rate(pve_network_receive_bytes_total[$__rate_interval]) * on(id) group_left(name) pve_guest_info",
-          "legendFormat": "{{name}} in"
+          "expr": "node_hwmon_temp_celsius{instance=\"sarten\",sensor=\"temp1\",chip=~\"platform_coretemp_.*\"} * on(chip, sensor) group_left(label) node_hwmon_sensor_label",
+          "legendFormat": "CPU {{label}}"
         },
         {
           "datasource": {
@@ -640,35 +535,33 @@
             "uid": "prometheus"
           },
           "refId": "B",
-          "expr": "-rate(pve_network_transmit_bytes_total[$__rate_interval]) * on(id) group_left(name) pve_guest_info",
-          "legendFormat": "{{name}} out"
+          "expr": "smartmon_temperature_celsius_raw_value * on(disk) group_left(device_model, serial_number) smartmon_device_info",
+          "legendFormat": "{{device_model}} {{serial_number}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps",
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "opacity",
+            "lineWidth": 1,
+            "fillOpacity": 0,
             "showPoints": "never",
-            "lineInterpolation": "smooth"
+            "lineInterpolation": "smooth",
+            "axisBorderShow": false,
+            "axisPlacement": "auto"
           },
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "unit": "celsius"
         },
         "overrides": []
       },
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
           "mode": "multi",
@@ -677,16 +570,17 @@
       }
     },
     {
-      "id": 13,
-      "type": "bargauge",
-      "title": "Guest disks",
+      "id": 10,
+      "type": "timeseries",
+      "title": "Network",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
         "x": 12,
-        "y": 13,
+        "y": 11,
         "w": 12,
         "h": 8
       },
@@ -697,141 +591,64 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "pve_disk_usage_bytes / pve_disk_size_bytes * on(id) group_left(name) pve_guest_info",
-          "legendFormat": "{{name}}",
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 0.7
-              },
-              {
-                "color": "red",
-                "value": 0.9
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "min": 0,
-          "max": 1
+          "expr": "sum(rate(node_network_receive_bytes_total{instance=\"sarten\",device=~\"nic.*\"}[$__rate_interval]))",
+          "legendFormat": "in"
         },
-        "overrides": []
-      },
-      "options": {
-        "orientation": "horizontal",
-        "showUnfilled": true,
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "displayMode": "gradient"
-      }
-    },
-    {
-      "id": 14,
-      "type": "row",
-      "title": "Storage",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 21,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 15,
-      "type": "bargauge",
-      "title": "Filesystems",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 22,
-        "w": 8,
-        "h": 7
-      },
-      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "refId": "A",
-          "expr": "1 - node_filesystem_avail_bytes{instance=\"sarten\",fstype=\"btrfs\"} / node_filesystem_size_bytes{instance=\"sarten\",fstype=\"btrfs\"}",
-          "legendFormat": "{{mountpoint}}",
-          "instant": true
+          "refId": "B",
+          "expr": "sum(rate(node_network_transmit_bytes_total{instance=\"sarten\",device=~\"nic.*\"}[$__rate_interval]))",
+          "legendFormat": "out"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 0.7
-              },
-              {
-                "color": "red",
-                "value": 0.9
-              }
-            ]
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "axisBorderShow": false,
+            "axisPlacement": "auto"
           },
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
-          "min": 0,
-          "max": 1
+          "unit": "Bps",
+          "min": 0
         },
         "overrides": []
       },
       "options": {
-        "orientation": "horizontal",
-        "showUnfilled": true,
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "displayMode": "lcd"
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       }
     },
     {
-      "id": 16,
+      "id": 11,
       "type": "table",
       "title": "Disks",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "transparent": true,
       "gridPos": {
-        "x": 8,
-        "y": 22,
-        "w": 16,
-        "h": 7
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 6
       },
       "targets": [
         {
@@ -860,7 +677,7 @@
             "uid": "prometheus"
           },
           "refId": "C",
-          "expr": "sum by (device_model, serial_number) (smartmon_reallocated_sector_ct_raw_value * on(disk) group_left(device_model, serial_number) smartmon_device_info)",
+          "expr": "sum by (device_model, serial_number) ((smartmon_reallocated_sector_ct_raw_value + ignoring(smart_id) smartmon_current_pending_sector_raw_value) * on(disk) group_left(device_model, serial_number) smartmon_device_info)",
           "format": "table",
           "instant": true
         },
@@ -870,23 +687,17 @@
             "uid": "prometheus"
           },
           "refId": "D",
-          "expr": "sum by (device_model, serial_number) (smartmon_current_pending_sector_raw_value * on(disk) group_left(device_model, serial_number) smartmon_device_info)",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "E",
           "expr": "sum by (device_model, serial_number) (smartmon_device_smart_healthy * on(disk) group_left(device_model, serial_number) smartmon_device_info)",
           "format": "table",
           "instant": true
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "align": "left"
+          }
+        },
         "overrides": [
           {
             "matcher": {
@@ -899,18 +710,12 @@
                 "value": "celsius"
               },
               {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              },
-              {
                 "id": "thresholds",
                 "value": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "green",
+                      "color": "text",
                       "value": null
                     },
                     {
@@ -923,75 +728,40 @@
                     }
                   ]
                 }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "Years on"
+              "options": "Years"
             },
             "properties": [
               {
                 "id": "decimals",
                 "value": 1
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "gauge",
-                  "mode": "gradient"
-                }
-              },
-              {
-                "id": "min",
-                "value": 0
-              },
-              {
-                "id": "max",
-                "value": 12
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    },
-                    {
-                      "color": "orange",
-                      "value": 5
-                    },
-                    {
-                      "color": "red",
-                      "value": 8
-                    }
-                  ]
-                }
               }
             ]
           },
           {
             "matcher": {
-              "id": "byRegexp",
-              "options": "Reallocated|Pending"
+              "id": "byName",
+              "options": "Bad sectors"
             },
             "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              },
               {
                 "id": "thresholds",
                 "value": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "green",
+                      "color": "text",
                       "value": null
                     },
                     {
@@ -1000,22 +770,21 @@
                     }
                   ]
                 }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "Health"
+              "options": "SMART"
             },
             "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background",
-                  "mode": "basic"
-                }
-              },
               {
                 "id": "mappings",
                 "value": [
@@ -1023,23 +792,29 @@
                     "type": "value",
                     "options": {
                       "0": {
-                        "text": "FAILING",
+                        "text": "failing",
                         "color": "red"
                       },
                       "1": {
-                        "text": "OK",
-                        "color": "green"
+                        "text": "ok",
+                        "color": "text"
                       }
                     }
                   }
                 ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
               }
             ]
           }
         ]
       },
       "options": {
-        "cellHeight": "md",
+        "cellHeight": "sm",
         "showHeader": true
       },
       "transformations": [
@@ -1056,10 +831,9 @@
               "device_model": "Model",
               "serial_number": "Serial",
               "Value #A": "Temp",
-              "Value #B": "Years on",
-              "Value #C": "Reallocated",
-              "Value #D": "Pending",
-              "Value #E": "Health"
+              "Value #B": "Years",
+              "Value #C": "Bad sectors",
+              "Value #D": "SMART"
             }
           }
         },
@@ -1074,265 +848,6 @@
           }
         }
       ]
-    },
-    {
-      "id": 17,
-      "type": "row",
-      "title": "Hardware",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 29,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 18,
-      "type": "timeseries",
-      "title": "CPU temperature",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 30,
-        "w": 12,
-        "h": 8
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "A",
-          "expr": "node_hwmon_temp_celsius{instance=\"sarten\",sensor=\"temp1\",chip=~\"platform_coretemp_.*\"} * on(chip, sensor) group_left(label) node_hwmon_sensor_label",
-          "legendFormat": "{{label}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "celsius",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
-            "showPoints": "never",
-            "lineInterpolation": "smooth"
-          },
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 19,
-      "type": "timeseries",
-      "title": "Disk temperature",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 30,
-        "w": 12,
-        "h": 8
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "A",
-          "expr": "smartmon_temperature_celsius_raw_value * on(disk) group_left(device_model, serial_number) smartmon_device_info",
-          "legendFormat": "{{device_model}} {{serial_number}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "celsius",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
-            "showPoints": "never",
-            "lineInterpolation": "smooth"
-          },
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 20,
-      "type": "timeseries",
-      "title": "Uplink",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 38,
-        "w": 12,
-        "h": 8
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "A",
-          "expr": "rate(node_network_receive_bytes_total{instance=\"sarten\",device=~\"nic.*|tailscale.*\"}[$__rate_interval]) > 0",
-          "legendFormat": "{{device}} in"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "B",
-          "expr": "-rate(node_network_transmit_bytes_total{instance=\"sarten\",device=~\"nic.*|tailscale.*\"}[$__rate_interval]) < 0",
-          "legendFormat": "{{device}} out"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 20,
-            "gradientMode": "opacity",
-            "showPoints": "never",
-            "lineInterpolation": "smooth"
-          },
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 21,
-      "type": "timeseries",
-      "title": "Disk I/O",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 38,
-        "w": 12,
-        "h": 8
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "A",
-          "expr": "rate(node_disk_read_bytes_total{instance=\"sarten\",device=~\"sd[a-z]\"}[$__rate_interval]) * on(device) group_left(device_model, serial_number) label_replace(smartmon_device_info, \"device\", \"$1\", \"disk\", \"/dev/(.*)\")",
-          "legendFormat": "{{device_model}} {{serial_number}} read"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "B",
-          "expr": "-rate(node_disk_written_bytes_total{instance=\"sarten\",device=~\"sd[a-z]\"}[$__rate_interval]) * on(device) group_left(device_model, serial_number) label_replace(smartmon_device_info, \"device\", \"$1\", \"disk\", \"/dev/(.*)\")",
-          "legendFormat": "{{device_model}} {{serial_number}} write"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
-            "showPoints": "never",
-            "lineInterpolation": "smooth"
-          },
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
     }
   ]
 }
