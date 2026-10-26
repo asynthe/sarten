@@ -23,6 +23,7 @@ each guest runs one docker compose stack. Each layer only does its own job.
 | `exporters` | node exporter, SMART metrics and smartd on the host |
 | `docker` | docker inside a guest |
 | `media`, `monitoring`, `wazuh` | each guest's compose stack |
+| `hermes` | Hermes Agent on its own guest, native install (no docker): a `hermes` system user, the dashboard as a systemd user service on port 9119, LAN only |
 
 | guest | runs |
 | --- | --- |
@@ -58,7 +59,10 @@ cd ../ansible && ansible-playbook site.yml -l guests
 Secrets live in `ansible/group_vars/all.sops.yaml`, encrypted with sops to the
 age key in `.sops.yaml`; change them with `sops edit`. Ansible loads the file
 through the `community.sops` vars plugin and Tofu through the `carlpett/sops`
-provider, so both read the same file with no wrapper.
+provider, so both read the same file with no wrapper. The `hermes` role needs
+a `hermes` map in there: `provider`, `default`, `api_key`, `api_key_env` (the
+`.env` variable name the provider expects, e.g. `OPENROUTER_API_KEY`), and
+optionally `base_url`.
 
 Tofu authenticates with the Proxmox API token stored there. Tokens cannot set
 LXC feature flags or bind mounts, so the `lxc` role applies those from the

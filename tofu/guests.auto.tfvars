@@ -43,6 +43,24 @@ containers = {
     EOT
   }
 
+  hermes = {
+    id       = 150
+    ip       = "192.168.1.143/24"
+    template = "local-btrfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
+    cores    = 2
+    memory   = 4096
+    disk     = 24
+    tags     = ["hermes"]
+    notes    = <<-EOT
+      # hermes
+      native install (install.sh), runs as the `hermes` system user · source: `ansible/roles/hermes`
+
+      | service | |
+      | --- | --- |
+      | Dashboard | http://192.168.1.143:9119 |
+    EOT
+  }
+
   wazuh = {
     id       = 130
     ip       = "192.168.1.142/24"

@@ -9,7 +9,6 @@
     - config/jellyfin
     - config/sonarr
     - config/radarr
-    - config/lidarr
     - config/prowlarr
     - config/bazarr
     - config/qbittorrent

@@ -21,11 +21,6 @@
         icon: radarr.png
         server: local
         container: radarr
-    - Lidarr:
-        href: http://192.168.1.140:8686
-        icon: lidarr.png
-        server: local
-        container: lidarr
     - Prowlarr:
         href: http://192.168.1.140:9696
         icon: prowlarr.png

@@ -1,0 +1,136 @@
+- name: Model credentials present
+  ansible.builtin.assert:
+    that: hermes is mapping and hermes.api_key is defined and hermes.api_key_env is defined
+    fail_msg: >-
+      Add hermes (provider, default, api_key, api_key_env, and optionally
+      base_url) to group_vars/all.sops.yaml with sops edit.
+
+- name: Prerequisites
+  ansible.builtin.apt:
+    name: [curl, git, acl, libatomic1]
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Hermes user
+  ansible.builtin.user:
+    name: "{{ hermes_user }}"
+    shell: /bin/bash
+    create_home: true
+  register: hermes_user_info
+
+- name: Installed already
+  ansible.builtin.stat:
+    path: "/home/{{ hermes_user }}/.local/bin/hermes"
+  register: hermes_bin
+
+- name: Install Hermes
+  become: true
+  become_user: "{{ hermes_user }}"
+  become_method: su
+  ansible.builtin.shell: curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser
+  args:
+    chdir: "/home/{{ hermes_user }}"
+  when: not hermes_bin.stat.exists
+
+- name: Model provider
+  become: true
+  become_user: "{{ hermes_user }}"
+  become_method: su
+  ansible.builtin.command: >-
+    /home/{{ hermes_user }}/.local/bin/hermes config set model.{{ item }} {{ hermes[item] }}
+  loop: [provider, default, base_url]
+  when: hermes[item] is defined
+  changed_when: false
+
+- name: Dashboard settings
+  become: true
+  become_user: "{{ hermes_user }}"
+  become_method: su
+  ansible.builtin.command: "/home/{{ hermes_user }}/.local/bin/hermes config set {{ item.key }} {{ item.value }}"
+  loop:
+    - { key: dashboard.enabled, value: "true" }
+    - { key: dashboard.host, value: "0.0.0.0" }
+    - { key: dashboard.port, value: "{{ hermes_dashboard_port }}" }
+  changed_when: false
+
+- name: Secrets file present
+  ansible.builtin.stat:
+    path: "/home/{{ hermes_user }}/.hermes/.env"
+  register: hermes_env
+
+- name: Dashboard auth secret
+  ansible.builtin.set_fact:
+    hermes_dashboard_password: "{{ lookup('community.general.random_string', length=24, special=false) }}"
+    hermes_dashboard_secret: "{{ lookup('community.general.random_string', length=48, special=false) }}"
+  when: not hermes_env.stat.exists
+  no_log: true
+
+- name: Secrets file
+  ansible.builtin.copy:
+    dest: "/home/{{ hermes_user }}/.hermes/.env"
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: "0600"
+    content: |
+      {{ hermes.api_key_env }}={{ hermes.api_key }}
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME=admin
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD={{ hermes_dashboard_password }}
+      HERMES_DASHBOARD_BASIC_AUTH_SECRET={{ hermes_dashboard_secret }}
+  when: not hermes_env.stat.exists
+  no_log: true
+
+- name: Show dashboard password once
+  ansible.builtin.debug:
+    msg: "Dashboard login: admin / {{ hermes_dashboard_password }} (not shown again, not stored in this repo)"
+  when: not hermes_env.stat.exists
+
+- name: Systemd user directory
+  ansible.builtin.file:
+    path: "/home/{{ hermes_user }}/.config/systemd/user"
+    state: directory
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: "0755"
+
+- name: Dashboard unit
+  ansible.builtin.copy:
+    dest: "/home/{{ hermes_user }}/.config/systemd/user/hermes-dashboard.service"
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Hermes Agent Web Dashboard
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      WorkingDirectory=/home/{{ hermes_user }}/.hermes/hermes-agent
+      EnvironmentFile=/home/{{ hermes_user }}/.hermes/.env
+      Environment=PATH=/home/{{ hermes_user }}/.local/bin:/usr/local/bin:/usr/bin:/bin
+      ExecStart=/home/{{ hermes_user }}/.local/bin/hermes dashboard --host 0.0.0.0 --port {{ hermes_dashboard_port }} --no-open
+      Restart=on-failure
+      RestartSec=5
+      RestartPreventExitStatus=78
+
+      [Install]
+      WantedBy=default.target
+  register: unit
+
+- name: Linger
+  ansible.builtin.command: loginctl enable-linger {{ hermes_user }}
+  changed_when: false
+
+- name: Dashboard running
+  become: true
+  become_user: "{{ hermes_user }}"
+  become_method: su
+  ansible.builtin.systemd:
+    name: hermes-dashboard.service
+    scope: user
+    daemon_reload: true
+    enabled: true
+    state: "{{ 'restarted' if (unit is changed or hermes_bin is changed) else 'started' }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ hermes_user_info.uid }}"

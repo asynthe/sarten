@@ -25,7 +25,6 @@
     arrs:
       - { name: sonarr, port: 8989, api: v3, category: tvCategory, roots: [/data/series, /data/anime] }
       - { name: radarr, port: 7878, api: v3, category: movieCategory, roots: [/data/movies] }
-      - { name: lidarr, port: 8686, api: v1, category: musicCategory, roots: [/data/music] }
       - { name: prowlarr, port: 9696, api: v1 }
     qbittorrent_settings:
       - { section: BitTorrent, option: 'Session\DefaultSavePath', value: /data/downloads/ }
@@ -67,3 +66,12 @@
     - { role: lxc, tags: [wazuh, lxc] }
     - { role: docker, tags: [wazuh, docker] }
     - { role: wazuh, tags: wazuh }
+
+- name: hermes
+  hosts: hermes
+  vars:
+    hermes_user: hermes
+    hermes_dashboard_port: 9119
+  roles:
+    - { role: lxc, tags: [hermes, lxc] }
+    - { role: hermes, tags: hermes }

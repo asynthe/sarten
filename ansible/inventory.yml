@@ -22,5 +22,8 @@ all:
           ansible_host: 192.168.1.142
           ct_id: 130
           ct_features: keyctl=1,nesting=1
+        hermes:
+          ansible_host: 192.168.1.143
+          ct_id: 150
   vars:
     ansible_user: root

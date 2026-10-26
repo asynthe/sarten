@@ -36,14 +36,6 @@ services:
       - ./config/radarr:/config
       - /srv/media:/data
 
-  lidarr:
-    <<: *arr
-    image: lscr.io/linuxserver/lidarr:latest
-    ports: ["8686:8686"]
-    volumes:
-      - ./config/lidarr:/config
-      - /srv/media:/data
-
   prowlarr:
     <<: *arr
     image: lscr.io/linuxserver/prowlarr:latest
