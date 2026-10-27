@@ -1,0 +1,46 @@
+- name: Stack files
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../services/honeypot/"
+    dest: "{{ honeypot_dir }}/"
+    mode: "0644"
+  register: files
+
+- name: Log directory
+  ansible.builtin.file:
+    path: "{{ honeypot_dir }}/logs"
+    state: directory
+    owner: "101"
+    group: "101"
+    mode: "0755"
+
+- name: logrotate
+  ansible.builtin.apt:
+    name: logrotate
+
+- name: Log rotation
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/honeypot
+    mode: "0644"
+    content: |
+      {{ honeypot_dir }}/logs/*.log {
+          daily
+          rotate 30
+          compress
+          delaycompress
+          missingok
+          notifempty
+          copytruncate
+      }
+
+- name: Stack running
+  ansible.builtin.command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ honeypot_dir }}"
+  register: up
+  changed_when: "'Started' in up.stderr or 'Created' in up.stderr or 'Recreated' in up.stderr"
+
+- name: Reload changed config
+  ansible.builtin.command: docker compose restart
+  args:
+    chdir: "{{ honeypot_dir }}"
+  when: files is changed and up is not changed

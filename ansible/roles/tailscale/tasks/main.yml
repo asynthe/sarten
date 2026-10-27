@@ -50,15 +50,16 @@
 - name: Serve wanted
   ansible.builtin.set_fact:
     serve_wanted: >-
-      {% set out = [] %}{% for s in tailscale_serve %}{% set _ = out.append(s.port ~ ' ' ~ s.scheme | default('http') ~ '://' ~ hostvars[s.guest].ansible_host ~ ':' ~ s.to | default(s.port)) %}{% endfor %}{{ out | sort }}
+      {% set out = [] %}{% for s in tailscale_serve %}{% set _ = out.append(s.port ~ ' ' ~ s.scheme | default('http') ~ '://' ~ hostvars[s.guest].ansible_host ~ ':' ~ s.to | default(s.port) ~ ' ' ~ ('funnel' if s.funnel | default(false) else 'http')) %}{% endfor %}{{ out | sort }}
     serve_current: >-
-      {% set out = [] %}{% for k, v in ((serve.stdout | from_json).Web | default({})).items() %}{% set _ = out.append(k.split(':')[-1] ~ ' ' ~ v.Handlers['/'].Proxy) %}{% endfor %}{{ out | sort }}
+      {% set out = [] %}{% set st = serve.stdout | from_json %}{% for k, v in (st.Web | default({})).items() %}{% set _ = out.append(k.split(':')[-1] ~ ' ' ~ v.Handlers['/'].Proxy ~ ' ' ~ ('funnel' if (st.AllowFunnel | default({}))[k] | default(false) else 'http')) %}{% endfor %}{{ out | sort }}
 
 - name: Serve reset
   ansible.builtin.command: tailscale serve reset
   when: serve_wanted != serve_current
 
 - name: Serve guests
-  ansible.builtin.command: tailscale serve --bg --http={{ item.split(' ')[0] }} {{ item.split(' ')[1] }}
+  ansible.builtin.command: >-
+    {{ 'tailscale funnel --bg --https=' if item.split(' ')[2] == 'funnel' else 'tailscale serve --bg --http=' }}{{ item.split(' ')[0] }} {{ item.split(' ')[1] }}
   loop: "{{ serve_wanted }}"
   when: serve_wanted != serve_current

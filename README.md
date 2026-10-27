@@ -1,8 +1,43 @@
+```
+        .-~~~~~~~-.
+      .'           '.
+     /     .---.     \
+    |     ( (@) )     |==========[]
+     \     '---'     /
+      '.           .'
+        '-._____.-'
+```
+
 # sarten
 
-Infrastructure for a single-node Proxmox VE homelab. OpenTofu decides which
-guests exist, Ansible configures the host and everything inside the guests, and
-each guest runs one docker compose stack. Each layer only does its own job.
+A home SOC lab: a Proxmox server monitored by a self-hosted Wazuh SIEM, built
+and configured entirely as code. Two services face the internet on purpose, a
+media server and a honeypot, so the lab watches real-world attacks as well as
+its own.
+
+```
+        internet
+           │ Tailscale Funnel
+           ├──────────────────┐
+           ▼ :443             ▼ :8443
+┌──── sarten · Proxmox VE · Debian 13 ────────────────────────────────────────┐
+│ wazuh-agent · rsyslog · node exporter · smartd                              │
+│                                                                             │
+│ ┌─ media ────────┐ ┌─ honeypot ─────┐ ┌─ monitoring ───┐ ┌─ wazuh ────────┐ │
+│ │ Jellyfin       │ │ nginx decoy    │ │ Prometheus     │ │ manager        │ │
+│ │ arr apps       │ │ read-only,     │ │ Grafana        │ │ indexer        │ │
+│ │ qBittorrent    │ │   no caps      │ │ PVE exporter   │ │ dashboard      │ │
+│ │   behind VPN   │ │                │ │                │ │ syslog 514/udp │ │
+│ └────────────────┘ └────────────────┘ └────────────────┘ └────────▲───────┘ │
+│ ┌─ hermes ───────────────────────────┐                             │        │
+│ │ Hermes Agent, native install,      │                             │        │
+│ │ dashboard :9119, LAN only           │                             │        │
+│ └─────────────────────────────────────┘                             │        │
+└───────────────────────────────────────────────────────────────────┼─────────┘
+                                                                    │ agents
+                                    sarten, media, honeypot, hermes (Debian 13)
+                                                                p1 (Windows 11)
+```
 
 | folder | what |
 | --- | --- |
@@ -22,27 +57,8 @@ each guest runs one docker compose stack. Each layer only does its own job.
 | `lxc` | container feature flags and bind mounts, from the host |
 | `exporters` | node exporter, SMART metrics and smartd on the host |
 | `docker` | docker inside a guest |
-| `media`, `monitoring`, `wazuh` | each guest's compose stack |
+| `media`, `monitoring`, `wazuh`, `honeypot` | each guest's compose stack |
 | `hermes` | Hermes Agent on its own guest, native install (no docker): a `hermes` system user, the dashboard as a systemd user service on port 9119, LAN only |
-
-| guest | runs |
-| --- | --- |
-| `media` | jellyfin, the arr apps, qbittorrent behind gluetun, flaresolverr, homepage |
-| `monitoring` | prometheus, grafana, the Proxmox exporter |
-| `wazuh` | single-node Wazuh manager, indexer and dashboard; takes syslog |
-
-The `media` role also wires the apps together through their APIs: qBittorrent
-saves to `/data/downloads/<category>` on the same subvolume as the library, so
-imports are hardlinks; each arr gets its root folders and qBittorrent as
-download client; Prowlarr syncs its indexers to them, sending Cloudflare sites
-through FlareSolverr; Bazarr reads Sonarr and Radarr. Each step only adds what
-is missing, so changes made in the UIs stay. Logins are `media_user` with
-`media_password`, skipped from local addresses; qBittorrent's traffic leaves
-only through the VPN in `vpn`, a map of gluetun environment variables.
-
-`services/wazuh/` is upstream's single-node stack, trimmed to fit an
-unprivileged container: no memlock, a lower file limit, and only the dashboard,
-agent and syslog ports published.
 
 ## Deploy
 
@@ -64,23 +80,65 @@ a `hermes` map in there: `provider`, `default`, `api_key`, `api_key_env` (the
 `.env` variable name the provider expects, e.g. `OPENROUTER_API_KEY`), and
 optionally `base_url`.
 
-Tofu authenticates with the Proxmox API token stored there. Tokens cannot set
-LXC feature flags or bind mounts, so the `lxc` role applies those from the
-inventory and Tofu ignores them. Every step is idempotent; re-run the one whose
-folder changed. `-t config` pushes only `config/`.
+## Detections
 
-## Once per install
+| what | how | status |
+| --- | --- | --- |
+| SSH logins, sudo to root, PAM sessions | agent reads `auth.log` on the host | working |
+| CIS benchmark: Debian 13, Windows 11 | Wazuh SCA on each agent | working |
+| Jellyfin logins and brute force from the internet | Jellyfin log, [custom decoder and rules](services/wazuh/config/ruleset/) | working |
+| every honeypot request, scans, SQL injection | nginx access log, custom and built-in web rules | working |
+| Proxmox web UI access | agent reads the `pveproxy` access log | collecting |
+| file integrity | Wazuh FIM, defaults | collecting |
+| vulnerable packages | Wazuh vulnerability detection | working |
+| SSH brute force, blocked automatically | hydra from Kali, active response | planned |
+| web shells | DVWA target, FIM and YARA | planned |
+| network scans | Suricata on the lab bridge | planned |
 
-| step | how |
-| --- | --- |
-| root ssh key | `ssh-copy-id root@<host>` |
-| data mirror | `mkfs.btrfs -L sarten-data -d raid1 -m raid1 <disk> <disk>` |
-| tailnet | `tailscale up --advertise-routes=<lan>`, then approve the route |
-| web UI login for admins | `passwd <user>` |
+| rule | level | fires on |
+| --- | --- | --- |
+| 100102 | 5 | Jellyfin login failed, with the attacker's IP |
+| 100103 | 10 | 8 failed Jellyfin logins in 2 minutes from one IP (MITRE T1110) |
+| 100110 | 6 | any honeypot request: nothing legitimate ever visits it |
+| 100111 | 10 | 20 honeypot requests in a minute from one IP (MITRE T1595) |
 
-## Recovery
+Each rule was tested with `wazuh-logtest` and then end to end: a failed login
+sent through Tailscale Funnel from outside reached Wazuh as rule 100102 with
+the sender's real public IP.
 
-Both `/` and the data mirror are btrfs RAID1, which refuses to mount with a
-disk missing. For `/`, add `rootflags=degraded` to the kernel line at boot, then
-`btrfs replace` the dead disk. The data mirror is `nofail` and never blocks
-boot; mount it with `-o degraded` and replace the same way.
+## Honeypot
+
+A decoy "Admin Console" login page, public at port 8443 of the Funnel address.
+It has no users, so every request is an alert. It is nginx in a read-only
+container with every Linux capability dropped and no privilege escalation; the
+form posts nowhere real. It sits on the home network for now and moves to the
+isolated lab bridge once that exists.
+
+## Findings
+
+**Default credentials.** The Wazuh stack first ran on upstream's demo
+passwords, committed in this public repo. They were rotated into sops, loaded
+into the indexer with `securityadmin.sh`, and the old `admin` password was
+verified to be rejected. They remain in git history, inert.
+
+**The proxy hid every attacker.** Tailscale Funnel passes the client's address
+in `X-Forwarded-For`, but Jellyfin didn't trust it, so every login from the
+internet was logged as coming from the Proxmox host. Brute force would have
+been unattributable, and Jellyfin treated internet visitors as local. Fixed by
+trusting the host as a known proxy; verified with a failed login from outside.
+
+**A nightly blind spot.** Jellyfin names its log after the local date; the
+containers ran on UTC, so from 21:00 to midnight the agent watched the next
+day's file, which didn't exist yet. Three hours of logins every night would
+have gone unseen. Fixed by putting every container on the host's timezone.
+
+## Stack
+
+Proxmox VE · OpenTofu · Ansible · Docker · Wazuh 4.14 · Prometheus · Grafana ·
+Tailscale · sops + age
+
+OpenTofu creates the guests, Ansible configures the host and everything inside
+them, and each guest runs one compose stack. Nothing decrypted is committed.
+Technical reference: [docs/DOCS.md](docs/DOCS.md).
+
+*asynthe, 2026.*

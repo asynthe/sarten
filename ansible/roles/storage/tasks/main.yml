@@ -31,7 +31,7 @@
 
 - name: Media layout
   ansible.builtin.file:
-    path: "{{ data_mount }}/media/{{ item }}"
+    path: "{{ media_root }}/{{ item }}"
     state: directory
     owner: "{{ media_owner }}"
     group: "{{ media_owner }}"

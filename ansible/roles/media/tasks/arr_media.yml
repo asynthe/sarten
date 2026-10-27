@@ -1,0 +1,16 @@
+- name: "{{ arr.name }} media management current"
+  ansible.builtin.uri:
+    url: "{{ arr_url }}/config/mediamanagement"
+    headers: { X-Api-Key: "{{ arr_keys[arr.name] }}" }
+  register: arr_media
+
+- name: "{{ arr.name }} media management wanted"
+  ansible.builtin.uri:
+    url: "{{ arr_url }}/config/mediamanagement/{{ arr_media.json.id }}"
+    method: PUT
+    headers: { X-Api-Key: "{{ arr_keys[arr.name] }}" }
+    body_format: json
+    body: "{{ arr_media.json | combine(arr.media_management) }}"
+    status_code: [200, 202]
+  when: arr_media.json | combine(arr.media_management) != arr_media.json
+  changed_when: true

@@ -55,6 +55,6 @@ resource "proxmox_virtual_environment_container" "ct" {
   }
 
   lifecycle {
-    ignore_changes = [mount_point, features]
+    ignore_changes = [mount_point, features, device_passthrough]
   }
 }

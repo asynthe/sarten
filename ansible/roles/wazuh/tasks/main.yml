@@ -1,9 +1,66 @@
+- name: Secrets present
+  ansible.builtin.assert:
+    that:
+      - wazuh is mapping
+      - wazuh.admin_password is defined
+      - wazuh.admin_hash is defined
+      - wazuh.dashboard_password is defined
+      - wazuh.dashboard_hash is defined
+      - wazuh.api_password is defined
+      - "\"'\" not in wazuh.admin_password ~ wazuh.dashboard_password ~ wazuh.api_password"
+    fail_msg: >-
+      Add wazuh (admin_password, admin_hash, dashboard_password, dashboard_hash, api_password)
+      to group_vars/all.sops.yaml with sops edit; passwords must not contain single quotes.
+
 - name: Stack files
   ansible.builtin.copy:
     src: "{{ playbook_dir }}/../services/wazuh/"
     dest: "{{ wazuh_dir }}/"
     mode: "0644"
   register: files
+
+- name: Compose env
+  ansible.builtin.copy:
+    dest: "{{ wazuh_dir }}/.env"
+    mode: "0600"
+    content: |
+      INDEXER_PASSWORD='{{ wazuh.admin_password }}'
+      DASHBOARD_PASSWORD='{{ wazuh.dashboard_password }}'
+      API_PASSWORD='{{ wazuh.api_password }}'
+
+- name: Dashboard API connection
+  ansible.builtin.copy:
+    dest: "{{ wazuh_dir }}/config/wazuh_dashboard/wazuh.yml"
+    mode: "0644"
+    content: |
+      hosts:
+        - 1513629884013:
+            url: "https://wazuh.manager"
+            port: 55000
+            username: wazuh-wui
+            password: {{ wazuh.api_password | to_json }}
+            run_as: true
+  register: dashboard
+
+- name: Indexer users
+  ansible.builtin.copy:
+    dest: "{{ wazuh_dir }}/config/wazuh_indexer/internal_users.yml"
+    mode: "0644"
+    content: |
+      _meta:
+        type: "internalusers"
+        config_version: 2
+
+      admin:
+        hash: {{ wazuh.admin_hash | to_json }}
+        reserved: true
+        backend_roles:
+          - "admin"
+
+      kibanaserver:
+        hash: {{ wazuh.dashboard_hash | to_json }}
+        reserved: true
+  register: users
 
 - name: Certificates
   ansible.builtin.command: docker compose -f generate-certs.yml run --rm generator
@@ -18,8 +75,44 @@
   register: up
   changed_when: "'Started' in up.stderr or 'Created' in up.stderr or 'Recreated' in up.stderr"
 
+- name: Indexer sees new users file
+  ansible.builtin.command: docker compose restart wazuh.indexer
+  args:
+    chdir: "{{ wazuh_dir }}"
+  when: users is changed
+
+- name: Load indexer users
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - exec
+      - -T
+      - wazuh.indexer
+      - bash
+      - -c
+      - >-
+        d=/usr/share/wazuh-indexer &&
+        JAVA_HOME=$d/jdk bash $d/plugins/opensearch-security/tools/securityadmin.sh
+        -f $d/config/opensearch-security/internal_users.yml -t internalusers
+        -h wazuh.indexer -p 9200 -icl -nhnv
+        -cacert $d/config/certs/root-ca.pem -cert $d/config/certs/admin.pem -key $d/config/certs/admin-key.pem
+  args:
+    chdir: "{{ wazuh_dir }}"
+  register: securityadmin
+  until: securityadmin.rc == 0
+  retries: 12
+  delay: 10
+  when: users is changed
+
 - name: Reload changed config
+  ansible.builtin.command: docker compose restart wazuh.manager wazuh.dashboard
+  args:
+    chdir: "{{ wazuh_dir }}"
+  when: users is changed
+
+- name: Reload changed stack files
   ansible.builtin.command: docker compose restart
   args:
     chdir: "{{ wazuh_dir }}"
-  when: files is changed and up is not changed
+  when: users is not changed and (files is changed or dashboard is changed) and up is not changed

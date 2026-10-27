@@ -9,7 +9,7 @@ containers = {
     tags     = ["docker", "media"]
     notes    = <<-EOT
       # media
-      docker compose, `/opt/media` · source: `services/media` in the sarten repo
+      docker compose · source: `services/media` in the sarten repo
 
       | service | |
       | --- | --- |
@@ -34,7 +34,7 @@ containers = {
     tags     = ["docker", "monitoring"]
     notes    = <<-EOT
       # monitoring
-      docker compose, `/opt/monitoring` · source: `services/monitoring` in the sarten repo
+      docker compose · source: `services/monitoring` in the sarten repo
 
       | service | |
       | --- | --- |
@@ -45,7 +45,7 @@ containers = {
 
   hermes = {
     id       = 150
-    ip       = "192.168.1.143/24"
+    ip       = "192.168.1.144/24"
     template = "local-btrfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
     cores    = 2
     memory   = 4096
@@ -57,7 +57,7 @@ containers = {
 
       | service | |
       | --- | --- |
-      | Dashboard | http://192.168.1.143:9119 |
+      | Dashboard | http://192.168.1.144:9119 |
     EOT
   }
 
@@ -71,13 +71,34 @@ containers = {
     tags     = ["docker", "security"]
     notes    = <<-EOT
       # wazuh
-      docker compose, `/opt/wazuh` · source: `services/wazuh` in the sarten repo
+      docker compose · source: `services/wazuh` in the sarten repo
 
       | service | |
       | --- | --- |
       | Dashboard | https://192.168.1.142 |
       | Agents | 1514/tcp, enrollment 1515/tcp |
       | Syslog | 514/udp |
+    EOT
+  }
+
+  honeypot = {
+    id       = 140
+    ip       = "192.168.1.143/24"
+    template = "local-btrfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
+    cores    = 1
+    memory   = 1024
+    disk     = 8
+    tags     = ["docker", "security"]
+    notes    = <<-EOT
+      # honeypot
+      docker compose · source: `services/honeypot` in the sarten repo
+
+      Decoy web page, public on Tailscale Funnel at :8443. Every request is
+      logged with the visitor's IP and sent to Wazuh.
+
+      | service | |
+      | --- | --- |
+      | Decoy | http://192.168.1.143 |
     EOT
   }
 }

@@ -33,8 +33,8 @@
       ansible.builtin.copy:
         dest: "{{ media_dir }}/config/bazarr/config/config.yaml"
         content: "{{ bazarr_want | to_nice_yaml(indent=2, width=1000) }}"
-        owner: "1000"
-        group: "1000"
+        owner: "{{ media_uid }}"
+        group: "{{ media_uid }}"
         mode: "0644"
       no_log: true
 
@@ -42,3 +42,96 @@
       ansible.builtin.command: docker compose up -d bazarr
       args:
         chdir: "{{ media_dir }}"
+
+
+- name: Bazarr API
+  ansible.builtin.set_fact:
+    bazarr_api: http://127.0.0.1:6767/api
+    bazarr_headers: { X-API-KEY: "{{ bazarr_now.auth.apikey }}" }
+    bazarr_providers: "{{ subtitle_providers + (subtitles | default({}) | list) }}"
+    bazarr_profile:
+      profileId: 1
+      name: "{{ subtitle_languages | join(' + ') }}"
+      cutoff: null
+      items: >-
+        {% set out = [] %}{% for l in subtitle_languages %}{% set _ = out.append({'id': loop.index, 'language': l,
+        'audio_exclude': 'False', 'audio_only_include': 'False', 'hi': 'False', 'forced': 'False'}) %}{% endfor %}{{ out }}
+      mustContain: []
+      mustNotContain: []
+      originalFormat: null
+      tag: null
+    bazarr_credentials: >-
+      {% set out = {} %}{% for p, kv in (subtitles | default({})).items() %}{% for k, v in kv.items() %}{%
+      set _ = out.update({'settings-' ~ p ~ '-' ~ k: v}) %}{% endfor %}{% endfor %}{{ out }}
+  no_log: true
+
+- name: Bazarr state
+  ansible.builtin.uri:
+    url: "{{ bazarr_api }}/system/{{ item }}"
+    headers: "{{ bazarr_headers }}"
+  loop: [settings, languages/profiles]
+  register: bazarr_state
+  retries: 30
+  delay: 5
+  until: bazarr_state.status == 200
+  no_log: true
+
+- name: Bazarr credentials changed
+  ansible.builtin.set_fact:
+    bazarr_credentials_changed: >-
+      {% set out = [] %}{% for k, v in bazarr_credentials.items() %}{% set p = k.split('-') %}{%
+      if (bazarr_state.results[0].json[p[1]] | default({}))[p[2]] | default(none) != v %}{%
+      set _ = out.append(k) %}{% endif %}{% endfor %}{{ out | length > 0 }}
+  no_log: true
+
+- name: Bazarr subtitle settings
+  ansible.builtin.uri:
+    url: "{{ bazarr_api }}/system/settings"
+    method: POST
+    headers: "{{ bazarr_headers }}"
+    body_format: form-urlencoded
+    body: >-
+      {{ {'languages-enabled': subtitle_languages,
+          'languages-profiles': [bazarr_profile] | to_json,
+          'settings-general-enabled_providers': bazarr_providers,
+          'settings-general-movie_default_enabled': 'true',
+          'settings-general-movie_default_profile': '1',
+          'settings-general-serie_default_enabled': 'true',
+          'settings-general-serie_default_profile': '1'} | combine(bazarr_credentials) }}
+    status_code: 204
+  vars:
+    current: "{{ bazarr_state.results[0].json }}"
+  when: >-
+    bazarr_state.results[1].json | map(attribute='items') | flatten | map(attribute='language') | list != subtitle_languages
+    or current.general.enabled_providers | sort != bazarr_providers | sort
+    or current.general.movie_default_profile | string != '1'
+    or current.general.serie_default_profile | string != '1'
+    or bazarr_credentials_changed | bool
+  changed_when: true
+  no_log: true
+
+- name: Bazarr items
+  ansible.builtin.uri:
+    url: "{{ bazarr_api }}/{{ item }}"
+    headers: "{{ bazarr_headers }}"
+  loop: [movies, series]
+  register: bazarr_items
+  no_log: true
+
+- name: Bazarr profile on existing items
+  ansible.builtin.uri:
+    url: "{{ bazarr_api }}/{{ item.0 }}"
+    method: POST
+    headers: "{{ bazarr_headers }}"
+    body_format: form-urlencoded
+    body: "{{ {item.1: ids, 'profileid': ['1'] * (ids | length)} }}"
+    status_code: 204
+  vars:
+    ids: "{{ item.2.json.data | selectattr('profileId', 'none') | map(attribute=item.3) | list }}"
+  loop:
+    - [movies, radarrid, "{{ bazarr_items.results[0] }}", radarrId]
+    - [series, seriesid, "{{ bazarr_items.results[1] }}", sonarrSeriesId]
+  loop_control:
+    label: "{{ item.0 }}"
+  when: ids | length > 0
+  changed_when: true

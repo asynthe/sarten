@@ -1,0 +1,50 @@
+radarr:
+  movies:
+    base_url: http://radarr:7878
+    api_key: !secret radarr_api_key
+    delete_old_custom_formats: true
+    quality_definition:
+      type: movie
+      qualities:
+        - { name: Bluray-1080p, min: 8 }
+        - { name: WEBDL-1080p, min: 8 }
+        - { name: WEBRip-1080p, min: 8 }
+        - { name: Bluray-720p, min: 5 }
+        - { name: WEBDL-720p, min: 5 }
+        - { name: WEBRip-720p, min: 5 }
+    quality_profiles:
+      - trash_id: d1d67249d3890e49bc12e275d989a7e9
+        min_format_score: 10000
+        upgrade:
+          allowed: true
+          until_score: 15000
+        reset_unmatched_scores:
+          enabled: true
+          except:
+            - Over size limit
+            - YTS
+    media_naming:
+      folder: jellyfin-tmdb
+      movie:
+        rename: true
+        standard: jellyfin-tmdb
+
+sonarr:
+  series:
+    base_url: http://sonarr:8989
+    api_key: !secret sonarr_api_key
+    delete_old_custom_formats: true
+    quality_definition:
+      type: series
+    quality_profiles:
+      - trash_id: 72dae194fc92bf828f32cde7744e51a1
+        reset_unmatched_scores:
+          enabled: true
+    media_naming:
+      series: jellyfin-tvdb
+      season: default
+      episodes:
+        rename: true
+        standard: default
+        daily: default
+        anime: default
